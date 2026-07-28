@@ -1,0 +1,22 @@
+target/
+out/
+.settings/
+.classpath
+.project
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# Local test configs with real data/credentials - keep the *.json examples
+# under testdata/ generic and put anything real in a *.local.json file.
+*.local.json
+
+# Defensive: no env files or key material belong in this repo, even though
+# the project doesn't use any today.
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.jks

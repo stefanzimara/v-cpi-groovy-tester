@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>de.cpitester</groupId>
+    <artifactId>cpi-groovy-tester</artifactId>
+    <version>1.0.0</version>
+    <packaging>jar</packaging>
+
+    <name>CPI Groovy Tester</name>
+    <description>Lokale Testumgebung fuer SAP Cloud Integration Groovy Scripts</description>
+
+    <properties>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <!--
+      CPI hat zwei Script-Generationen mit unterschiedlicher Groovy-Laufzeit:
+
+        Script Version 1.x -> Groovy 2.4, com.sap.gateway.ip.core.customdev.util.Message
+        Script Version 2.x -> Groovy 4,   com.sap.it.script.v2.api.Message
+
+      Groovy 2.4 laeuft auf Java 17 nicht mehr, deshalb steht fuer die alte
+      Generation Groovy 3.0.x als naechstliegende Variante bereit.
+
+        ./build.sh              -> Groovy 4  (Default, passend zu Script Version 2.x)
+        ./build.sh -Pgroovy3    -> Groovy 3  (fuer alte Scripte)
+
+      Beide Message-Klassen sind immer vorhanden; der Runner waehlt anhand der
+      Signatur von processData(..) die passende aus.
+    -->
+    <profiles>
+        <profile>
+            <id>groovy4</id>
+            <activation><activeByDefault>true</activeByDefault></activation>
+            <properties>
+                <groovy.groupId>org.apache.groovy</groovy.groupId>
+                <groovy.version>4.0.24</groovy.version>
+            </properties>
+        </profile>
+        <profile>
+            <id>groovy3</id>
+            <properties>
+                <groovy.groupId>org.codehaus.groovy</groovy.groupId>
+                <groovy.version>3.0.23</groovy.version>
+            </properties>
+        </profile>
+    </profiles>
+
+    <dependencies>
+        <!-- Groovy Runtime -->
+        <dependency>
+            <groupId>${groovy.groupId}</groupId>
+            <artifactId>groovy</artifactId>
+            <version>${groovy.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>${groovy.groupId}</groupId>
+            <artifactId>groovy-json</artifactId>
+            <version>${groovy.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>${groovy.groupId}</groupId>
+            <artifactId>groovy-xml</artifactId>
+            <version>${groovy.version}</version>
+        </dependency>
+        <!-- liefert Date.parse(..) / Date.format(..), in Groovy 2.4 Teil des Kerns -->
+        <dependency>
+            <groupId>${groovy.groupId}</groupId>
+            <artifactId>groovy-dateutil</artifactId>
+            <version>${groovy.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>${groovy.groupId}</groupId>
+            <artifactId>groovy-templates</artifactId>
+            <version>${groovy.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>${groovy.groupId}</groupId>
+            <artifactId>groovy-sql</artifactId>
+            <version>${groovy.version}</version>
+        </dependency>
+
+        <!-- In CPI verfuegbare Libraries, die Scripte typischerweise nutzen -->
+        <dependency>
+            <groupId>net.sf.json-lib</groupId>
+            <artifactId>json-lib</artifactId>
+            <version>2.4</version>
+            <classifier>jdk15</classifier>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <version>3.12.0</version>
+        </dependency>
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <version>2.11.0</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>cpi-groovy-tester</finalName>
+        <plugins>
+            <!-- Bewusst kein Shade-/Uber-JAR: groovy-dateutil, groovy-xml und groovy-sql
+                 bringen jeweils eine eigene META-INF/groovy/...ExtensionModule mit. Beim
+                 Zusammenfuehren ueberlebt nur eine davon - dann fehlt z.B. Date.parse(..).
+                 Stattdessen ein schlankes JAR + lib/-Ordner ueber den Manifest-Classpath. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.3.0</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <mainClass>de.cpitester.Main</mainClass>
+                            <addClasspath>true</addClasspath>
+                            <classpathPrefix>lib/</classpathPrefix>
+                        </manifest>
+                    </archive>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.6.1</version>
+                <executions>
+                    <execution>
+                        <id>copy-dependencies</id>
+                        <phase>package</phase>
+                        <goals><goal>copy-dependencies</goal></goals>
+                        <configuration>
+                            <outputDirectory>${project.build.directory}/lib</outputDirectory>
+                            <overWriteReleases>false</overWriteReleases>
+                            <overWriteSnapshots>true</overWriteSnapshots>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

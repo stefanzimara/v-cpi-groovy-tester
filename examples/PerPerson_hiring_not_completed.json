@@ -1,0 +1,177 @@
+{
+  "PerPerson": {
+    "personIdExternal": "10012345",
+    "dateOfBirth": "1985-04-12T00:00:00.000",
+    "personalInfoNav": {
+      "PerPersonal": [
+        {
+          "startDate": "2019-03-01T00:00:00.000",
+          "endDate": "2022-12-31T00:00:00.000",
+          "lastName": "Muster ",
+          "firstName": "Anna",
+          "gender": "F",
+          "preferredName": "Anna",
+          "customString1": "Muster",
+          "nativePreferredLangNav": {
+            "PicklistOption": {
+              "externalCode": "DE"
+            }
+          }
+        },
+        {
+          "startDate": "2023-01-01T00:00:00.000",
+          "endDate": "9999-12-31T00:00:00.000",
+          "lastName": "Musterfrau-Beispiel ",
+          "firstName": " Anna Maria",
+          "gender": "F",
+          "preferredName": "Anna",
+          "customString1": "Musterfrau",
+          "nativePreferredLangNav": {
+            "PicklistOption": {
+              "externalCode": "DE"
+            }
+          }
+        }
+      ]
+    },
+    "employmentNav": {
+      "EmpEmployment": [
+        {
+          "startDate": "2019-03-01T00:00:00.000",
+          "endDate": "",
+          "lastDateWorked": "",
+          "lastModifiedDateTime": "2026-06-30T10:12:33.000",
+          "userNav": {
+            "User": {
+              "externalCodeOfcust_HRC_IT0036Nav": {
+                "cust_HRC_IT0036": [
+                  {
+                    "cust_NAHVN": "756.1234.5678.97",
+                    "effectiveStartDate": "2019-03-01T00:00:00.000",
+                    "effectiveEndDate": "9999-12-31T00:00:00.000"
+                  }
+                ]
+              }
+            }
+          },
+          "jobInfoNav": {
+            "EmpJob": [
+              {
+                "startDate": "2019-03-01T00:00:00.000",
+                "endDate": "2023-05-31T00:00:00.000",
+                "seqNumber": 1,
+                "event": "1",
+                "costCenter": "CC-4700",
+                "managerId": "10008888",
+                "company": "1000",
+                "location": "CH-BRN-02",
+                "department": "DEP-0001",
+                "departmentNav": {
+                  "FODepartment": {
+                    "name": "Apotheke Bern",
+                    "cust_apothekenkrzl": "ABE"
+                  }
+                },
+                "customString13Nav": {
+                  "PicklistOption": {
+                    "externalCode": "NO"
+                  }
+                },
+                "employeeClassNav": {
+                  "PicklistOption": {
+                    "externalCode": "ANGEST"
+                  }
+                },
+                "customString9Nav": {
+                  "PicklistOption": {
+                    "externalCode": "TEILZEIT"
+                  }
+                },
+                "positionNav": {
+                  "Position": {
+                    "externalName_defaultValue": "Pharma-Assistentin"
+                  }
+                }
+              },
+              {
+                "startDate": "2023-06-01T00:00:00.000",
+                "endDate": "9999-12-31T00:00:00.000",
+                "seqNumber": 1,
+                "event": "26",
+                "costCenter": "CC-4710",
+                "managerId": "10009999",
+                "company": "1000",
+                "location": "CH-ZRH-01",
+                "department": "DEP-0815",
+                "departmentNav": {
+                  "FODepartment": {
+                    "name": "Apotheke Bahnhof Zuerich",
+                    "cust_apothekenkrzl": "ABZ"
+                  }
+                },
+                "customString13Nav": {
+                  "PicklistOption": {
+                    "externalCode": "YES"
+                  }
+                },
+                "employeeClassNav": {
+                  "PicklistOption": {
+                    "externalCode": "ANGEST"
+                  }
+                },
+                "customString9Nav": {
+                  "PicklistOption": {
+                    "externalCode": "TEILZEIT"
+                  }
+                },
+                "positionNav": {
+                  "Position": {
+                    "externalName_defaultValue": "Pharma-Assistentin"
+                  }
+                }
+              },
+              {
+                "startDate": "2023-06-01T00:00:00.000",
+                "endDate": "9999-12-31T00:00:00.000",
+                "seqNumber": 2,
+                "event": "26",
+                "costCenter": "CC-4711",
+                "managerId": "10009999",
+                "company": "1000",
+                "location": "CH-ZRH-01",
+                "department": "DEP-0815",
+                "departmentNav": {
+                  "FODepartment": {
+                    "name": "Apotheke Bahnhof Zürich & Umgebung",
+                    "cust_apothekenkrzl": "ABZ"
+                  }
+                },
+                "customString13Nav": {
+                  "PicklistOption": {
+                    "externalCode": "YES"
+                  }
+                },
+                "employeeClassNav": {
+                  "PicklistOption": {
+                    "externalCode": "ANGEST"
+                  }
+                },
+                "customString9Nav": {
+                  "PicklistOption": {
+                    "externalCode": "VOLLZEIT"
+                  }
+                },
+                "positionNav": {
+                  "Position": {
+                    "externalName_defaultValue": "Leiterin Apotheke"
+                  }
+                }
+              }
+            ]
+          },
+          "hiringNotCompleted": true
+        }
+      ]
+    }
+  }
+}

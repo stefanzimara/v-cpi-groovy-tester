@@ -1,0 +1,18 @@
+{
+  "script": "../scripts/OrderToXml.groovy",
+  "body": "order.json",
+  "entryMethod": "processData",
+  "messageLogEnabled": true,
+
+  "headers": {
+    "SourceSystem": "webshop"
+  },
+
+  "properties": {
+    "debugLoggingEnabled": "false",
+    "currency": "EUR"
+  },
+
+  "credentials": {
+  }
+}

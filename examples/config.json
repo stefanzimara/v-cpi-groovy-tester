@@ -1,0 +1,21 @@
+{
+  "script": "PerPersonToXml.groovy",
+  "body": "PerPerson_sample.json",
+  "entryMethod": "processData",
+  "messageLogEnabled": true,
+
+  "headers": {
+    "SapAuthenticatedUserName": "S0001234567",
+    "CamelHttpMethod": "POST"
+  },
+
+  "properties": {
+    "debugLoggingEnabled": "true",
+    "processDebugLog": "",
+    "picklistMappings": "{\"picklistMappings\":[]}",
+    "ForceCutOffDateEntry": ""
+  },
+
+  "credentials": {
+  }
+}

@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>CPI Groovy Tester</title>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --panel: #ffffff;
+    --border: #d6dae1;
+    --text: #1d2530;
+    --muted: #6b7787;
+    --accent: #0a6ed1;
+    --accent-text: #ffffff;
+    --ok: #157a3f;
+    --err: #b52222;
+    --code-bg: #fbfcfd;
+    --overlay: rgba(20, 24, 29, .45);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14181d;
+      --panel: #1c2128;
+      --border: #2f3742;
+      --text: #dfe4ea;
+      --muted: #8b97a6;
+      --accent: #3b93e6;
+      --accent-text: #0d1116;
+      --ok: #4bbd7c;
+      --err: #ef6b6b;
+      --code-bg: #171c22;
+      --overlay: rgba(0, 0, 0, .6);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text);
+    display: flex; flex-direction: column;
+  }
+  header {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 8px 12px; background: var(--panel); border-bottom: 1px solid var(--border);
+  }
+  header h1 { font-size: 14px; margin: 0 8px 0 0; font-weight: 600; letter-spacing: .2px; white-space: nowrap; }
+  #brandLogo { height: 20px; width: auto; display: block; margin-right: 2px; }
+  button {
+    font: inherit; padding: 5px 11px; border-radius: 5px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--panel); color: var(--text);
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
+  button.on { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  button.primary:disabled { opacity: .55; cursor: default; }
+  button.icon { padding: 5px 9px; }
+  input[type=text] {
+    font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    padding: 5px 7px; border: 1px solid var(--border); border-radius: 5px;
+    background: var(--panel); color: var(--text); min-width: 60px;
+  }
+  select {
+    font: inherit; padding: 5px 7px; border-radius: 5px;
+    border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer;
+  }
+  label.check { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); }
+  .muted { color: var(--muted); font-size: 12px; }
+  #runtime { margin-left: auto; }
+  #status { font-weight: 600; }
+  #status.ok { color: var(--ok); }
+  #status.err { color: var(--err); }
+  #status.busy { color: var(--muted); }
+
+  main { flex: 1; display: grid; grid-template-columns: 1fr 10px 1fr; padding: 8px; min-height: 0; }
+  .col { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+  #colRight { display: grid; grid-template-rows: 1fr 10px 1fr; }
+
+  /* Draggable splitters between panels */
+  .gutter { position: relative; touch-action: none; }
+  .gutter-v { cursor: col-resize; }
+  .gutter-h { cursor: row-resize; }
+  .gutter::after {
+    content: ''; position: absolute; background: var(--border); border-radius: 2px;
+    transition: background .12s;
+  }
+  .gutter-v::after { top: 50%; left: 50%; width: 3px; height: 40px; transform: translate(-50%, -50%); }
+  .gutter-h::after { left: 50%; top: 50%; height: 3px; width: 40px; transform: translate(-50%, -50%); }
+  .gutter:hover::after, .gutter.dragging::after { background: var(--accent); }
+  .panel {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 7px;
+    display: flex; flex-direction: column; min-height: 0; overflow: hidden; flex: 1;
+  }
+  .panel > .bar {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    padding: 5px 8px; border-bottom: 1px solid var(--border); background: var(--code-bg);
+  }
+  .bar .grow { flex: 1; }
+  .tabs { display: flex; gap: 2px; flex-wrap: wrap; }
+  .tab {
+    padding: 4px 10px; border-radius: 5px 5px 0 0; cursor: pointer; color: var(--muted);
+    border: 1px solid transparent; border-bottom: none; user-select: none; white-space: nowrap;
+  }
+  .tab.active { background: var(--panel); border-color: var(--border); color: var(--text); font-weight: 600; }
+  .tab .badge {
+    display: inline-block; min-width: 15px; padding: 0 4px; margin-left: 5px; border-radius: 8px;
+    background: var(--border); color: var(--text); font-size: 10px; text-align: center;
+  }
+  .body { flex: 1; min-height: 0; display: none; }
+  .body.active { display: flex; flex-direction: column; }
+  textarea, pre.out {
+    flex: 1; width: 100%; min-height: 0; margin: 0; resize: none; border: none; outline: none;
+    padding: 8px 10px; background: var(--code-bg); color: var(--text);
+    font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    white-space: pre; overflow: auto; tab-size: 4;
+  }
+  pre.out { white-space: pre-wrap; word-break: break-word; }
+  pre.out.error { color: var(--err); }
+  .kv { flex: 1; overflow: auto; padding: 6px; }
+  .kv table { width: 100%; border-collapse: collapse; }
+  .kv td { padding: 2px; vertical-align: top; }
+  .kv td.k { width: 34%; }
+  .kv input { width: 100%; }
+  .kv td.x { width: 26px; }
+  .kv button.del { padding: 3px 7px; color: var(--muted); }
+  .kv .add { margin-top: 6px; }
+  .hint { color: var(--muted); padding: 6px 10px; font-size: 12px; border-top: 1px solid var(--border); }
+  .attachment { border-bottom: 1px solid var(--border); }
+  .attachment > summary { padding: 6px 10px; cursor: pointer; font-weight: 600; }
+  .attachment > pre {
+    margin: 0; padding: 8px 10px; background: var(--code-bg); max-height: 340px; overflow: auto;
+    font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap;
+  }
+  .scroll { flex: 1; overflow: auto; }
+  @media (max-width: 1000px) {
+    main { grid-template-columns: 1fr; }
+    #colRight { display: flex; flex-direction: column; gap: 8px; }
+    .gutter { display: none; }
+  }
+
+  /* Help modal */
+  #helpOverlay {
+    display: none; position: fixed; inset: 0; background: var(--overlay);
+    align-items: center; justify-content: center; z-index: 100; padding: 24px;
+  }
+  #helpOverlay.open { display: flex; }
+  #helpDialog {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    width: min(760px, 100%); max-height: min(640px, 100%); display: flex; flex-direction: column;
+    overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.35);
+  }
+  #helpDialog > .bar {
+    display: flex; align-items: center; gap: 6px; padding: 8px 8px 0 12px;
+    border-bottom: 1px solid var(--border); background: var(--code-bg); flex-wrap: wrap;
+  }
+  #helpDialog > .bar strong { margin-right: auto; font-size: 14px; }
+  #helpBody { flex: 1; overflow: auto; padding: 16px 20px; }
+  #helpBody h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  #helpBody h3:not(:first-child) { margin-top: 20px; }
+  #helpBody p { margin: 0 0 10px; line-height: 1.6; }
+  #helpBody ul, #helpBody ol { margin: 0 0 10px; padding-left: 20px; line-height: 1.6; }
+  #helpBody li { margin-bottom: 4px; }
+  #helpBody code, #helpBody kbd {
+    font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    background: var(--code-bg); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px;
+  }
+  #helpBody pre {
+    background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px;
+    padding: 10px 12px; overflow: auto; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  #helpBody a { color: var(--accent); }
+  .help-pane { display: none; }
+  .help-pane.active { display: block; }
+  .about-logo { height: 34px; width: auto; margin-bottom: 10px; }
+  .warn-box {
+    border: 1px solid var(--err); border-radius: 6px; padding: 10px 12px; margin-bottom: 10px;
+    background: color-mix(in srgb, var(--err) 10%, transparent);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <img id="brandLogo" src="/assets/valcoba-logo.png" alt="Valcoba">
+  <h1>CPI Groovy Tester</h1>
+  <button class="primary" id="btnRun"><span id="btnRunLabel">▶ Run</span> <span style="opacity:.7">(⌘/Ctrl+↵)</span></button>
+  <label class="check"><span data-i18n="header.entry">Entry point</span> <input type="text" id="entryMethod" value="processData" size="12"></label>
+  <label class="check"><input type="checkbox" id="messageLogEnabled" checked> <span data-i18n="header.messageLog">messageLog active</span></label>
+  <span id="runtime" class="muted"></span>
+  <span id="status"></span>
+  <select id="langSelect" title="Language / Sprache"></select>
+  <button class="icon" id="btnHelp" data-i18n-title="header.helpTitle" title="Help">?</button>
+</header>
+
+<main>
+  <!-- left column: script -->
+  <div class="col">
+    <section class="panel">
+      <div class="bar">
+        <strong data-i18n="panel.script">Script</strong>
+        <input type="text" id="scriptPath" class="grow" data-i18n-placeholder="panel.scriptPathPlaceholder" placeholder="scripts/MyScript.groovy">
+        <button id="btnScriptLoad" data-i18n="action.load">Load</button>
+        <button id="btnScriptSave" data-i18n="action.save">Save</button>
+      </div>
+      <div class="body active"><textarea id="script" spellcheck="false"></textarea></div>
+    </section>
+  </div>
+
+  <div class="gutter gutter-v" id="gutterMain" data-i18n-title="gutter.title" title="Drag to resize, double-click to reset"></div>
+
+  <!-- right column: inputs on top, results below -->
+  <div class="col" id="colRight">
+    <section class="panel" id="inPanel">
+      <div class="bar">
+        <div class="tabs" data-group="in">
+          <div class="tab active" data-tab="body" data-i18n="tab.input">Input</div>
+          <div class="tab" data-tab="headers"><span data-i18n="tab.headers">Headers</span> <span class="badge" id="cntHeaders">0</span></div>
+          <div class="tab" data-tab="props"><span data-i18n="tab.properties">Properties</span> <span class="badge" id="cntProps">0</span></div>
+        </div>
+        <div class="grow"></div>
+        <input type="text" id="bodyPath" data-i18n-placeholder="panel.bodyPathPlaceholder" placeholder="testdata/input.json" size="24">
+        <button id="btnBodyLoad" data-i18n="action.load">Load</button>
+        <button id="btnBodySave" data-i18n="action.save">Save</button>
+      </div>
+      <div class="body active" data-body="body"><textarea id="bodyIn" spellcheck="false"></textarea></div>
+      <div class="body" data-body="headers">
+        <div class="kv"><table id="tblHeaders"></table>
+          <button class="add" data-add="headers" data-i18n="action.addHeader">+ Header</button></div>
+      </div>
+      <div class="body" data-body="props">
+        <div class="kv"><table id="tblProps"></table>
+          <button class="add" data-add="props" data-i18n="action.addProperty">+ Property</button></div>
+        <div class="hint" data-i18n="hint.properties">Common CPI properties (examples): debugLoggingEnabled, processDebugLog. Add whatever your script expects.</div>
+      </div>
+    </section>
+
+    <div class="gutter gutter-h" id="gutterRight" data-i18n-title="gutter.title" title="Drag to resize, double-click to reset"></div>
+
+    <section class="panel" id="outPanel">
+      <div class="bar">
+        <div class="tabs" data-group="out">
+          <div class="tab active" data-tab="output" data-i18n="tab.output">Output</div>
+          <div class="tab" data-tab="console" data-i18n="tab.console">Console</div>
+          <div class="tab" data-tab="rprops"><span data-i18n="tab.resultProps">Result props</span> <span class="badge" id="cntRProps">0</span></div>
+          <div class="tab" data-tab="attach"><span data-i18n="tab.attachments">Attachments</span> <span class="badge" id="cntAttach">0</span></div>
+        </div>
+        <div class="grow"></div>
+        <button id="btnCopy" data-i18n="action.copy" data-i18n-title="action.copyTitle" title="Copy the active tab's content to the clipboard">Copy</button>
+        <button id="btnPretty" data-i18n="action.pretty" data-i18n-title="action.prettyTitle" title="Display only - Save always writes the unchanged body">Pretty</button>
+        <input type="text" id="outPath" data-i18n-placeholder="panel.outPathPlaceholder" placeholder="out/output.xml" size="14">
+        <button id="btnOutSave" data-i18n="action.save">Save</button>
+      </div>
+      <div class="body active" data-body="output"><pre class="out" id="output"></pre></div>
+      <div class="body" data-body="console"><pre class="out" id="console"></pre></div>
+      <div class="body" data-body="rprops"><div class="scroll" id="rprops"></div></div>
+      <div class="body" data-body="attach"><div class="scroll" id="attachments"></div></div>
+    </section>
+  </div>
+</main>
+
+<!-- Help modal -->
+<div id="helpOverlay">
+  <div id="helpDialog">
+    <div class="bar">
+      <strong data-i18n="help.title">Help</strong>
+      <div class="tabs" data-group="help">
+        <div class="tab active" data-tab="quickstart" data-i18n="help.tabQuickstart">Quickstart</div>
+        <div class="tab" data-tab="config" data-i18n="help.tabConfig">Config</div>
+        <div class="tab" data-tab="shortcuts" data-i18n="help.tabShortcuts">Shortcuts</div>
+        <div class="tab" data-tab="security" data-i18n="help.tabSecurity">Security</div>
+        <div class="tab" data-tab="about" data-i18n="help.tabAbout">About</div>
+      </div>
+      <div class="grow"></div>
+      <button class="icon" id="btnHelpClose" data-i18n-title="help.close" title="Close">✕</button>
+    </div>
+    <div id="helpBody">
+      <div class="help-pane active" data-help="quickstart" data-i18n-html="help.quickstart"></div>
+      <div class="help-pane" data-help="config" data-i18n-html="help.config"></div>
+      <div class="help-pane" data-help="shortcuts" data-i18n-html="help.shortcuts"></div>
+      <div class="help-pane" data-help="security" data-i18n-html="help.security"></div>
+      <div class="help-pane" data-help="about" data-i18n-html="help.about"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const STORE = 'cpi-groovy-tester-state';
+
+/* Access token from the URL (?t=...) is attached to every request.
+   Nothing changes if no token is configured. */
+const TOKEN = new URLSearchParams(location.search).get('t');
+/* State-changing endpoints (run/save) require this header even without a
+   token - see WebUi.CSRF_HEADER for why. */
+const CSRF_HEADER = 'X-Tester-Csrf';
+function apiGet(path) {
+  return fetch(path + (TOKEN ? (path.includes('?') ? '&' : '?') + 't=' + encodeURIComponent(TOKEN) : ''));
+}
+function apiPost(path, payload) {
+  const headers = { 'Content-Type': 'application/json', [CSRF_HEADER]: '1' };
+  if (TOKEN) headers['X-Tester-Token'] = TOKEN;
+  return fetch(path, { method: 'POST', headers, body: JSON.stringify(payload) });
+}
+
+/* ================================================================
+   i18n
+   To add a language: add its code to LANGUAGES and a matching object
+   to I18N with the same keys as `en`. Nothing else needs to change -
+   the language picker, detection and fallback all read from these.
+   ================================================================ */
+const LANGUAGES = [
+  { code: 'en', label: 'English' },
+  { code: 'de', label: 'Deutsch' }
+];
+const I18N = {
+  en: {
+    'header.entry': 'Entry point',
+    'header.messageLog': 'messageLog active',
+    'header.helpTitle': 'Help',
+    'header.run': 'Run',
+    'panel.script': 'Script',
+    'panel.scriptPathPlaceholder': 'scripts/MyScript.groovy',
+    'panel.bodyPathPlaceholder': 'testdata/input.json',
+    'panel.outPathPlaceholder': 'out/output.xml',
+    'action.load': 'Load',
+    'action.save': 'Save',
+    'action.addHeader': '+ Header',
+    'action.addProperty': '+ Property',
+    'action.copy': 'Copy',
+    'action.copyTitle': 'Copy the active tab’s content to the clipboard',
+    'action.pretty': 'Pretty',
+    'action.prettyTitle': 'Display only – Save always writes the unchanged body',
+    'action.removeRow': 'Remove row',
+    'tab.input': 'Input',
+    'tab.headers': 'Headers',
+    'tab.properties': 'Properties',
+    'tab.output': 'Output',
+    'tab.console': 'Console',
+    'tab.resultProps': 'Result props',
+    'tab.attachments': 'Attachments',
+    'gutter.title': 'Drag to resize, double-click to reset',
+    'hint.properties': 'Common CPI properties (examples): debugLoggingEnabled, processDebugLog. Add whatever your script expects.',
+    'status.running': 'running …',
+    'status.noPath': 'No path given.',
+    'status.loaded': 'Loaded: {0}',
+    'status.saved': 'Saved: {0}',
+    'status.notPretty': 'No XML/JSON recognized – display unchanged',
+    'status.nothingToCopy': 'Nothing to copy',
+    'status.copied': '{0} copied ({1} characters)',
+    'status.copyFailed': 'Copy failed – please select manually',
+    'status.serverUnreachable': 'Server unreachable: {0}',
+    'status.error': 'Error: {0}',
+    'status.ok': 'OK · {0} ms · {1} characters',
+    'console.section': '--- Console ---',
+    'help.title': 'Help',
+    'help.close': 'Close',
+    'help.tabQuickstart': 'Quickstart',
+    'help.tabConfig': 'Config',
+    'help.tabShortcuts': 'Shortcuts',
+    'help.tabSecurity': 'Security',
+    'help.tabAbout': 'About',
+    'help.quickstart': `
+      <h3>What this is</h3>
+      <p>A local test harness for SAP Cloud Integration (CPI) Groovy scripts. It rebuilds the
+      CPI runtime classes (<code>Message</code>, <code>MessageLog</code>, <code>SecureStoreService</code>)
+      so a script written for CPI runs completely unchanged – no adapting the code to a test
+      environment.</p>
+      <h3>Running a script</h3>
+      <ol>
+        <li>Load a script on the left, or edit it directly – the path field also lets you save changes back.</li>
+        <li>Put the message body under <b>Input</b>, and any headers/properties your script reads under
+        the <b>Headers</b>/<b>Properties</b> tabs.</li>
+        <li>Click <b>Run</b> (or <kbd>⌘/Ctrl</kbd>+<kbd>↵</kbd>).</li>
+        <li>The resulting body, console output, result properties (e.g. a debug log the script wrote)
+        and MessageLog attachments show up on the right.</li>
+      </ol>
+      <p>Everything is remembered in the browser between runs. The layout panels can be resized by
+      dragging the dividers between them; double-click a divider to reset it.</p>
+      <h3>Command line</h3>
+      <p>Everything the UI does is also available as a CLI, useful for scripting or CI:</p>
+      <pre>./run.sh run --script scripts/MyScript.groovy \\
+    --body testdata/input.json \\
+    --config testdata/config.json \\
+    --outdir out</pre>
+      <p>Run <code>./run.sh --help</code> for the full option list.</p>`,
+    'help.config': `
+      <h3>config.json</h3>
+      <p>Bundles script path, input file, headers, properties and mock credentials for a test case.
+      Paths are relative to the config file's own location.</p>
+      <pre>{
+  "script":      "../scripts/MyScript.groovy",
+  "body":        "input.json",
+  "entryMethod": "processData",
+  "messageLogEnabled": true,
+  "headers":     { "SapAuthenticatedUserName": "S0001234567" },
+  "properties":  { "debugLoggingEnabled": "true", "processDebugLog": "" },
+  "credentials": { "MyAlias": { "user": "u", "password": "p" } }
+}</pre>
+      <h3>What is emulated</h3>
+      <ul>
+        <li><code>com.sap.gateway.ip.core.customdev.util.Message</code> – Script Version 1.x</li>
+        <li><code>com.sap.it.script.v2.api.Message</code> – Script Version 2.x (Groovy 4)</li>
+        <li><code>MessageLog</code> / <code>messageLogFactory</code> – attachments, custom header properties</li>
+        <li><code>SecureStoreService</code> – credentials come from the config's <code>credentials</code> section</li>
+      </ul>
+      <p>The runner detects which Message class a script expects from the signature of its entry
+      method – no manual switching between script generations needed. See the project README for
+      the full list of known differences from the real CPI runtime (Groovy 3 vs. 2.4 quirks, etc.).</p>`,
+    'help.shortcuts': `
+      <h3>Keyboard</h3>
+      <ul>
+        <li><kbd>⌘/Ctrl</kbd>+<kbd>↵</kbd> – run the script from anywhere on the page</li>
+        <li><kbd>Tab</kbd> in the Script/Input editors indents instead of leaving the field</li>
+      </ul>
+      <h3>Mouse</h3>
+      <ul>
+        <li>Drag a divider between panels to resize; double-click it to reset to the default size</li>
+        <li>Click a result tab, then <b>Copy</b>, to copy exactly what is shown – including Pretty formatting</li>
+      </ul>`,
+    'help.security': `
+      <div class="warn-box">
+        <p style="margin:0"><b>This tool executes whatever Groovy code you give it, with your full user
+        permissions.</b> That is its entire purpose – it is a local developer tool, not a hardened
+        multi-user service.</p>
+      </div>
+      <h3>Defaults</h3>
+      <ul>
+        <li>The server binds to <code>127.0.0.1</code> only, unless started with <code>--bind lan</code>
+        (or a specific address).</li>
+        <li>As soon as it's reachable from the network, an access token is required (generated
+        automatically unless you pass <code>--token</code>).</li>
+        <li>File load/save is restricted to the project directory – no path traversal outside it.</li>
+        <li>Run/Save requests require a custom header the browser adds automatically; this blocks
+        other websites you have open from silently triggering code execution on this tool
+        while it's running (a class of vulnerability sometimes called "localhost CSRF").</li>
+      </ul>
+      <h3>What is on you</h3>
+      <ul>
+        <li>Never expose this to the open internet. There is no HTTPS built in – traffic, including
+        the token, is plaintext. For remote access, use an SSH tunnel or VPN, not port-forwarding
+        to a public IP.</li>
+        <li><code>--no-token</code> combined with a network bind removes all access control – only
+        use it on networks you fully trust.</li>
+        <li>Only run scripts you trust, from sources you trust – exactly like you would with any
+        other code you execute locally.</li>
+      </ul>
+      <p>Full details in <code>SECURITY.md</code> in the repository.</p>`,
+    'help.about': `
+      <img class="about-logo" src="/assets/valcoba-logo.png" alt="Valcoba">
+      <p><b>CPI Groovy Tester</b> – a local test harness for SAP Cloud Integration Groovy scripts.</p>
+      <p>Originally built for internal use at <a href="https://www.valcoba.com" target="_blank" rel="noopener">Valcoba</a>,
+      your CSV and Quality partner, and shared as open source.</p>
+      <p>Licensed under GPL-3.0. Not affiliated with or endorsed by SAP. "SAP", "SAP Cloud Integration"
+      and related marks are trademarks of SAP SE. The bundled runtime classes are a clean-room
+      reimplementation of the publicly documented Script API surface, written for local testing only
+      – they contain no SAP source code.</p>`,
+  },
+  de: {
+    'header.entry': 'Einstieg',
+    'header.messageLog': 'messageLog aktiv',
+    'header.helpTitle': 'Hilfe',
+    'header.run': 'Ausführen',
+    'panel.script': 'Script',
+    'panel.scriptPathPlaceholder': 'scripts/MeinScript.groovy',
+    'panel.bodyPathPlaceholder': 'testdata/input.json',
+    'panel.outPathPlaceholder': 'out/output.xml',
+    'action.load': 'Laden',
+    'action.save': 'Speichern',
+    'action.addHeader': '+ Header',
+    'action.addProperty': '+ Property',
+    'action.copy': 'Kopieren',
+    'action.copyTitle': 'Inhalt des aktiven Tabs in die Zwischenablage kopieren',
+    'action.pretty': 'Pretty',
+    'action.prettyTitle': 'Nur die Anzeige formatieren – gespeichert wird immer der unveränderte Body',
+    'action.removeRow': 'Zeile entfernen',
+    'tab.input': 'Input',
+    'tab.headers': 'Header',
+    'tab.properties': 'Properties',
+    'tab.output': 'Output',
+    'tab.console': 'Console',
+    'tab.resultProps': 'Ergebnis-Props',
+    'tab.attachments': 'Attachments',
+    'gutter.title': 'Ziehen zum Verschieben, Doppelklick setzt zurück',
+    'hint.properties': 'Häufige CPI-Properties (Beispiele): debugLoggingEnabled, processDebugLog. Ergänze, was dein Script erwartet.',
+    'status.running': 'läuft …',
+    'status.noPath': 'Kein Pfad angegeben.',
+    'status.loaded': 'Geladen: {0}',
+    'status.saved': 'Gespeichert: {0}',
+    'status.notPretty': 'Kein XML/JSON erkannt – Anzeige unverändert',
+    'status.nothingToCopy': 'Nichts zu kopieren',
+    'status.copied': '{0} kopiert ({1} Zeichen)',
+    'status.copyFailed': 'Kopieren fehlgeschlagen – bitte manuell markieren',
+    'status.serverUnreachable': 'Server nicht erreichbar: {0}',
+    'status.error': 'Fehler: {0}',
+    'status.ok': 'OK · {0} ms · {1} Zeichen',
+    'console.section': '--- Konsole ---',
+    'help.title': 'Hilfe',
+    'help.close': 'Schließen',
+    'help.tabQuickstart': 'Schnellstart',
+    'help.tabConfig': 'Konfiguration',
+    'help.tabShortcuts': 'Tasten',
+    'help.tabSecurity': 'Sicherheit',
+    'help.tabAbout': 'Über',
+    'help.quickstart': `
+      <h3>Worum es geht</h3>
+      <p>Eine lokale Testumgebung für SAP-Cloud-Integration-(CPI)-Groovy-Scripts. Sie baut die
+      CPI-Laufzeitklassen (<code>Message</code>, <code>MessageLog</code>, <code>SecureStoreService</code>)
+      nach, sodass ein für CPI geschriebenes Script vollkommen unverändert läuft – keine
+      Anpassung an eine Testumgebung nötig.</p>
+      <h3>Ein Script ausführen</h3>
+      <ol>
+        <li>Links ein Script laden oder direkt bearbeiten – das Pfadfeld erlaubt auch, Änderungen zurückzuspeichern.</li>
+        <li>Den Message-Body unter <b>Input</b> eintragen sowie Header/Properties, die das Script liest,
+        unter den Tabs <b>Header</b>/<b>Properties</b>.</li>
+        <li>Auf <b>Ausführen</b> klicken (oder <kbd>⌘/Ctrl</kbd>+<kbd>↵</kbd>).</li>
+        <li>Ergebnis-Body, Konsolenausgabe, Ergebnis-Properties (z.B. ein vom Script geschriebenes
+        Debug-Log) und MessageLog-Attachments erscheinen rechts.</li>
+      </ol>
+      <p>Alles wird im Browser zwischen den Läufen gemerkt. Die Bereiche lassen sich durch Ziehen
+      an den Trennern zwischen ihnen vergrößern/verkleinern; Doppelklick auf einen Trenner setzt ihn zurück.</p>
+      <h3>Kommandozeile</h3>
+      <p>Alles, was die UI macht, geht auch als CLI – nützlich zum Skripten oder in CI:</p>
+      <pre>./run.sh run --script scripts/MeinScript.groovy \\
+    --body testdata/input.json \\
+    --config testdata/config.json \\
+    --outdir out</pre>
+      <p><code>./run.sh --help</code> zeigt alle Optionen.</p>`,
+    'help.config': `
+      <h3>config.json</h3>
+      <p>Bündelt Scriptpfad, Eingabedatei, Header, Properties und Mock-Credentials für einen Testfall.
+      Pfade sind relativ zum Speicherort der config.json.</p>
+      <pre>{
+  "script":      "../scripts/MeinScript.groovy",
+  "body":        "input.json",
+  "entryMethod": "processData",
+  "messageLogEnabled": true,
+  "headers":     { "SapAuthenticatedUserName": "S0001234567" },
+  "properties":  { "debugLoggingEnabled": "true", "processDebugLog": "" },
+  "credentials": { "MeinAlias": { "user": "u", "password": "p" } }
+}</pre>
+      <h3>Was nachgebaut ist</h3>
+      <ul>
+        <li><code>com.sap.gateway.ip.core.customdev.util.Message</code> – Script Version 1.x</li>
+        <li><code>com.sap.it.script.v2.api.Message</code> – Script Version 2.x (Groovy 4)</li>
+        <li><code>MessageLog</code> / <code>messageLogFactory</code> – Attachments, Custom-Header-Properties</li>
+        <li><code>SecureStoreService</code> – Credentials kommen aus dem Abschnitt <code>credentials</code> der Config</li>
+      </ul>
+      <p>Der Runner erkennt anhand der Signatur der Einstiegsmethode, welche Message-Klasse ein
+      Script erwartet – kein manuelles Umschalten zwischen den Script-Generationen nötig. Die
+      vollständige Liste bekannter Unterschiede zur echten CPI-Laufzeit (Groovy 3 vs. 2.4 usw.)
+      steht im README des Projekts.</p>`,
+    'help.shortcuts': `
+      <h3>Tastatur</h3>
+      <ul>
+        <li><kbd>⌘/Ctrl</kbd>+<kbd>↵</kbd> – führt das Script aus, egal wo auf der Seite der Fokus liegt</li>
+        <li><kbd>Tab</kbd> in den Script-/Input-Editoren rückt ein, statt das Feld zu verlassen</li>
+      </ul>
+      <h3>Maus</h3>
+      <ul>
+        <li>An einem Trenner zwischen zwei Bereichen ziehen, um Größen anzupassen; Doppelklick setzt zurück</li>
+        <li>Einen Ergebnis-Tab anklicken, dann <b>Kopieren</b> – kopiert genau das Angezeigte, inklusive Pretty-Formatierung</li>
+      </ul>`,
+    'help.security': `
+      <div class="warn-box">
+        <p style="margin:0"><b>Dieses Werkzeug führt jeden Groovy-Code aus, den du ihm gibst – mit vollen
+        Rechten deines Benutzers.</b> Das ist sein gesamter Zweck: ein lokales Entwicklerwerkzeug,
+        kein gehärteter Mehrbenutzer-Dienst.</p>
+      </div>
+      <h3>Standardeinstellungen</h3>
+      <ul>
+        <li>Der Server bindet nur auf <code>127.0.0.1</code>, sofern nicht mit <code>--bind lan</code>
+        (oder einer konkreten Adresse) gestartet.</li>
+        <li>Sobald er im Netzwerk erreichbar ist, ist ein Zugriffstoken Pflicht (automatisch erzeugt,
+        sofern nicht per <code>--token</code> gesetzt).</li>
+        <li>Datei-Laden/-Speichern ist auf das Projektverzeichnis beschränkt – kein Verlassen über Pfadangaben.</li>
+        <li>Ausführen/Speichern verlangen einen eigenen Header, den der Browser automatisch setzt;
+        das verhindert, dass eine andere geöffnete Webseite heimlich Code auf diesem Tool auslöst,
+        während es läuft (eine Schwachstellenklasse, manchmal "localhost CSRF" genannt).</li>
+      </ul>
+      <h3>Was in deiner Verantwortung liegt</h3>
+      <ul>
+        <li>Nie ungeschützt ins offene Internet stellen. Es gibt kein eingebautes HTTPS – der
+        Datenverkehr, inklusive Token, ist Klartext. Für Fernzugriff einen SSH-Tunnel oder ein VPN
+        nutzen, keine Portweiterleitung auf eine öffentliche IP.</li>
+        <li><code>--no-token</code> zusammen mit Netzwerkbindung entfernt jede Zugriffskontrolle – nur
+        in Netzen verwenden, denen du voll vertraust.</li>
+        <li>Nur Scripts aus vertrauenswürdigen Quellen ausführen – genau wie bei jedem anderen
+        Code, den man lokal laufen lässt.</li>
+      </ul>
+      <p>Alle Details stehen in der <code>SECURITY.md</code> im Repository.</p>`,
+    'help.about': `
+      <img class="about-logo" src="/assets/valcoba-logo.png" alt="Valcoba">
+      <p><b>CPI Groovy Tester</b> – eine lokale Testumgebung für SAP-Cloud-Integration-Groovy-Scripts.</p>
+      <p>Ursprünglich für den internen Einsatz bei <a href="https://www.valcoba.com" target="_blank" rel="noopener">Valcoba</a>,
+      Your CSV and Quality Partner, entstanden und als Open Source veröffentlicht.</p>
+      <p>Lizenziert unter GPL-3.0. Keine Zugehörigkeit zu oder Unterstützung durch SAP. "SAP", "SAP
+      Cloud Integration" und verwandte Bezeichnungen sind Marken der SAP SE. Die mitgelieferten
+      Laufzeitklassen sind ein Clean-Room-Nachbau der öffentlich dokumentierten Script-API-Oberfläche,
+      ausschließlich für lokale Tests geschrieben – sie enthalten keinen SAP-Quellcode.</p>`,
+  }
+};
+
+let LANG = 'en';
+
+function t(key, ...args) {
+  const dict = I18N[LANG] || I18N.en;
+  let text = dict[key] ?? I18N.en[key] ?? key;
+  args.forEach((arg, i) => { text = text.replace('{' + i + '}', arg); });
+  return text;
+}
+
+function applyI18n() {
+  document.documentElement.lang = LANG;
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = t(el.dataset.i18nTitle); });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.placeholder = t(el.dataset.i18nPlaceholder); });
+  document.querySelectorAll('[data-i18n-html]').forEach(el => { el.innerHTML = t(el.dataset.i18nHtml); });
+  $('btnRunLabel').textContent = '▶ ' + t('header.run');
+}
+
+function setLanguage(code) {
+  LANG = I18N[code] ? code : 'en';
+  localStorage.setItem('cpi-groovy-tester-lang', LANG);
+  $('langSelect').value = LANG;
+  applyI18n();
+}
+
+function initLanguagePicker() {
+  const select = $('langSelect');
+  LANGUAGES.forEach(lang => {
+    const option = document.createElement('option');
+    option.value = lang.code;
+    option.textContent = lang.label;
+    select.appendChild(option);
+  });
+  select.addEventListener('change', () => setLanguage(select.value));
+
+  const stored = localStorage.getItem('cpi-groovy-tester-lang');
+  if (stored && I18N[stored]) {
+    setLanguage(stored);
+    return;
+  }
+  const browserLang = (navigator.language || 'en').slice(0, 2).toLowerCase();
+  setLanguage(I18N[browserLang] ? browserLang : 'en');
+}
+
+/* ---------- Help modal ---------- */
+$('btnHelp').onclick = () => $('helpOverlay').classList.add('open');
+$('btnHelpClose').onclick = () => $('helpOverlay').classList.remove('open');
+$('helpOverlay').addEventListener('click', ev => {
+  if (ev.target === $('helpOverlay')) $('helpOverlay').classList.remove('open');
+});
+document.addEventListener('keydown', ev => {
+  if (ev.key === 'Escape') $('helpOverlay').classList.remove('open');
+});
+
+/* ---------- Tabs (used for the main panels and the help dialog alike) ---------- */
+document.querySelectorAll('.tabs').forEach(group => {
+  group.addEventListener('click', ev => {
+    const tab = ev.target.closest('.tab');
+    if (!tab) return;
+    group.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t === tab));
+    if (group.dataset.group === 'help') {
+      document.querySelectorAll('.help-pane').forEach(p =>
+        p.classList.toggle('active', p.dataset.help === tab.dataset.tab));
+      return;
+    }
+    const panel = group.closest('.panel');
+    panel.querySelectorAll('.body').forEach(b =>
+      b.classList.toggle('active', b.dataset.body === tab.dataset.tab));
+  });
+});
+
+/* ---------- Key/value editors ---------- */
+const kv = { headers: [], props: [] };
+
+function renderKv(which) {
+  const table = which === 'headers' ? $('tblHeaders') : $('tblProps');
+  table.innerHTML = '';
+  kv[which].forEach((row, index) => {
+    const tr = document.createElement('tr');
+    const tdK = document.createElement('td'); tdK.className = 'k';
+    const tdV = document.createElement('td');
+    const tdX = document.createElement('td'); tdX.className = 'x';
+    const inK = document.createElement('input'); inK.type = 'text'; inK.value = row.k;
+    const inV = document.createElement('input'); inV.type = 'text'; inV.value = row.v;
+    inK.oninput = () => { row.k = inK.value; save(); updateCounts(); };
+    inV.oninput = () => { row.v = inV.value; save(); };
+    const del = document.createElement('button');
+    del.className = 'del'; del.textContent = '×'; del.title = t('action.removeRow');
+    del.onclick = () => { kv[which].splice(index, 1); renderKv(which); save(); updateCounts(); };
+    tdK.appendChild(inK); tdV.appendChild(inV); tdX.appendChild(del);
+    tr.append(tdK, tdV, tdX);
+    table.appendChild(tr);
+  });
+}
+
+document.querySelectorAll('button.add').forEach(button => {
+  button.onclick = () => {
+    kv[button.dataset.add].push({ k: '', v: '' });
+    renderKv(button.dataset.add);
+    updateCounts();
+  };
+});
+
+function kvToObject(which) {
+  const out = {};
+  kv[which].forEach(row => { if (row.k.trim() !== '') out[row.k] = row.v; });
+  return out;
+}
+
+function updateCounts() {
+  $('cntHeaders').textContent = Object.keys(kvToObject('headers')).length;
+  $('cntProps').textContent = Object.keys(kvToObject('props')).length;
+}
+
+/* ---------- Remembering state ---------- */
+function save() {
+  localStorage.setItem(STORE, JSON.stringify({
+    script: $('script').value, scriptPath: $('scriptPath').value,
+    body: $('bodyIn').value, bodyPath: $('bodyPath').value, outPath: $('outPath').value,
+    entryMethod: $('entryMethod').value, messageLogEnabled: $('messageLogEnabled').checked,
+    headers: kv.headers, props: kv.props, prettyOn: prettyOn
+  }));
+}
+
+function restore() {
+  let state = {};
+  try { state = JSON.parse(localStorage.getItem(STORE) || '{}'); } catch (e) { state = {}; }
+  $('script').value = state.script || '';
+  $('scriptPath').value = state.scriptPath || 'scripts/OrderToXml.groovy';
+  $('bodyIn').value = state.body || '';
+  $('bodyPath').value = state.bodyPath || 'testdata/order.json';
+  $('outPath').value = state.outPath || 'out/output.xml';
+  $('entryMethod').value = state.entryMethod || 'processData';
+  $('messageLogEnabled').checked = state.messageLogEnabled !== false;
+  prettyOn = state.prettyOn === true;
+  $('btnPretty').classList.toggle('on', prettyOn);
+  kv.headers = Array.isArray(state.headers) ? state.headers : [
+    { k: 'SourceSystem', v: 'webshop' }
+  ];
+  kv.props = Array.isArray(state.props) ? state.props : [
+    { k: 'debugLoggingEnabled', v: 'false' },
+    { k: 'currency', v: 'EUR' }
+  ];
+  renderKv('headers'); renderKv('props'); updateCounts();
+}
+
+['script', 'scriptPath', 'bodyIn', 'bodyPath', 'outPath', 'entryMethod'].forEach(id =>
+  $(id).addEventListener('input', save));
+$('messageLogEnabled').addEventListener('change', save);
+
+/* Tab key in the editors indents instead of leaving the field */
+['script', 'bodyIn'].forEach(id => $(id).addEventListener('keydown', ev => {
+  if (ev.key !== 'Tab') return;
+  ev.preventDefault();
+  const area = ev.target, start = area.selectionStart, end = area.selectionEnd;
+  area.value = area.value.slice(0, start) + '    ' + area.value.slice(end);
+  area.selectionStart = area.selectionEnd = start + 4;
+  save();
+}));
+
+/* ---------- File access ---------- */
+async function loadFile(pathInput, targetInput) {
+  const path = $(pathInput).value.trim();
+  if (!path) return setStatus(t('status.noPath'), 'err');
+  const response = await apiGet('/api/load?path=' + encodeURIComponent(path)).then(r => r.json());
+  if (!response.ok) return setStatus(response.error, 'err');
+  $(targetInput).value = response.content;
+  save();
+  setStatus(t('status.loaded', response.path), 'ok');
+}
+
+async function saveFile(path, content) {
+  if (!path) return setStatus(t('status.noPath'), 'err');
+  const response = await apiPost('/api/save', { path, content }).then(r => r.json());
+  setStatus(response.ok ? t('status.saved', response.path) : response.error, response.ok ? 'ok' : 'err');
+}
+
+$('btnScriptLoad').onclick = () => loadFile('scriptPath', 'script');
+$('btnScriptSave').onclick = () => saveFile($('scriptPath').value.trim(), $('script').value);
+$('btnBodyLoad').onclick = () => loadFile('bodyPath', 'bodyIn');
+$('btnBodySave').onclick = () => saveFile($('bodyPath').value.trim(), $('bodyIn').value);
+/* deliberately rawOutput, not the display: Save always writes the unchanged body */
+$('btnOutSave').onclick = () => saveFile($('outPath').value.trim(), rawOutput);
+
+/* ---------- Pretty-print ---------- */
+/* XML is formatted on the raw text on purpose, not re-serialized via the DOM
+   parser: that keeps entities like &amp; and the original attributes exactly
+   as they were. CDATA blocks are treated as a single unit. */
+function prettyXml(text) {
+  const src = text.trim();
+  if (!src.startsWith('<')) return null;
+  const tokens = src.split(/(<!\[CDATA\[[\s\S]*?\]\]>|<[^>]*>)/)
+                    .filter(t => t !== '' && !/^\s+$/.test(t));
+  const pad = (n) => '  '.repeat(Math.max(0, n));
+  const out = [];
+  let depth = 0, i = 0;
+  while (i < tokens.length) {
+    const t = tokens[i];
+    if (t.startsWith('</')) {
+      depth--;
+      out.push(pad(depth) + t);
+      i++;
+    } else if (t.startsWith('<?') || t.startsWith('<!') || t.endsWith('/>')) {
+      out.push(pad(depth) + t);
+      i++;
+    } else if (t.startsWith('<')) {
+      const next = tokens[i + 1], after = tokens[i + 2];
+      if (next && next.startsWith('</')) {
+        out.push(pad(depth) + t + next);                    // <Tag></Tag>
+        i += 2;
+      } else if (next && !next.startsWith('<') && after && after.startsWith('</')) {
+        out.push(pad(depth) + t + next.trim() + after);      // <Tag>Value</Tag>
+        i += 3;
+      } else {
+        out.push(pad(depth) + t);
+        depth++;
+        i++;
+      }
+    } else {
+      out.push(pad(depth) + t.trim());
+      i++;
+    }
+  }
+  return out.join('\n');
+}
+
+function prettyJson(text) {
+  const src = text.trim();
+  if (!src.startsWith('{') && !src.startsWith('[')) return null;
+  try {
+    return JSON.stringify(JSON.parse(src), null, 2);
+  } catch (e) {
+    return null;
+  }
+}
+
+function prettify(text) {
+  if (!text) return text;
+  return prettyJson(text) ?? prettyXml(text) ?? text;
+}
+
+let rawOutput = '';
+let prettyOn = false;
+let lastResult = null;
+
+function renderOutput() {
+  const formatted = prettyOn ? prettify(rawOutput) : rawOutput;
+  $('output').textContent = formatted;
+  $('btnPretty').classList.toggle('on', prettyOn);
+  /* Not formattable (e.g. plain text)? Say so instead of pretending. */
+  if (prettyOn && rawOutput && formatted === rawOutput) {
+    setStatus(t('status.notPretty'), 'busy');
+  }
+}
+
+$('btnPretty').onclick = () => {
+  prettyOn = !prettyOn;
+  renderOutput();
+  save();
+};
+
+/* ---------- Clipboard ---------- */
+/* navigator.clipboard only exists in a "secure context" (HTTPS or localhost).
+   When accessed via http://hostname.local it is unavailable, hence the
+   fallback via a hidden textarea. */
+async function copyToClipboard(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (e) {
+      /* e.g. permission denied -> try the fallback */
+    }
+  }
+  const helper = document.createElement('textarea');
+  helper.value = text;
+  helper.setAttribute('readonly', '');
+  helper.style.position = 'fixed';
+  helper.style.top = '-1000px';
+  helper.style.opacity = '0';
+  document.body.appendChild(helper);
+  helper.select();
+  helper.setSelectionRange(0, helper.value.length);
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+  document.body.removeChild(helper);
+  return ok;
+}
+
+/* Copies whatever result tab is currently visible - i.e. what you're looking
+   at (for Output, including Pretty formatting). */
+function activeResultText() {
+  const active = document.querySelector('.tabs[data-group="out"] .tab.active');
+  const tab = active ? active.dataset.tab : 'output';
+  if (tab === 'console') return { label: t('tab.console'), text: $('console').textContent };
+  if (tab === 'rprops') {
+    const entries = Object.entries((lastResult && lastResult.properties) || {});
+    return { label: t('tab.resultProps'), text: entries.map(([k, v]) => k + ':\n' + v).join('\n\n') };
+  }
+  if (tab === 'attach') {
+    const list = (lastResult && lastResult.attachments) || [];
+    return { label: t('tab.attachments'),
+             text: list.map(a => a.name + ' [' + (a.mimeType || '') + ']\n' + a.content).join('\n\n') };
+  }
+  return { label: t('tab.output'), text: $('output').textContent };
+}
+
+$('btnCopy').onclick = async () => {
+  const { label, text } = activeResultText();
+  if (!text) return setStatus(t('status.nothingToCopy'), 'busy');
+  const ok = await copyToClipboard(text);
+  setStatus(ok ? t('status.copied', label, text.length) : t('status.copyFailed'), ok ? 'ok' : 'err');
+};
+
+/* ---------- Run ---------- */
+function setStatus(text, kind) {
+  const status = $('status');
+  status.textContent = text || '';
+  status.className = kind || '';
+}
+
+async function run() {
+  setStatus(t('status.running'), 'busy');
+  $('btnRun').disabled = true;
+  const payload = {
+    script: $('script').value,
+    scriptName: ($('scriptPath').value.trim().split('/').pop()) || 'Script.groovy',
+    body: $('bodyIn').value,
+    entryMethod: $('entryMethod').value.trim() || 'processData',
+    messageLogEnabled: $('messageLogEnabled').checked,
+    headers: kvToObject('headers'),
+    properties: kvToObject('props')
+  };
+  let result;
+  try {
+    result = await apiPost('/api/run', payload).then(r => r.json());
+  } catch (e) {
+    $('btnRun').disabled = false;
+    return setStatus(t('status.serverUnreachable', e), 'err');
+  }
+  $('btnRun').disabled = false;
+
+  lastResult = result;
+  /* Which Groovy runtime and script-API generation is currently in effect.
+     CPI: Script Version 1.x = Groovy 2.4, Script Version 2.x = Groovy 4. */
+  $('runtime').textContent = result.groovyVersion
+    ? 'Groovy ' + result.groovyVersion + (result.apiVersion ? ' · ' + result.apiVersion : '')
+    : '';
+  rawOutput = result.body || '';
+  renderOutput();
+  $('output').classList.remove('error');
+  $('console').textContent = result.console || '';
+
+  if (!result.success) {
+    $('console').textContent =
+      (result.error || '') + '\n\n' + (result.stackTrace || '') +
+      (result.console ? '\n' + t('console.section') + '\n' + result.console : '');
+    $('console').classList.add('error');
+    setStatus(t('status.error', result.error || '?'), 'err');
+    activate('out', 'console');
+  } else {
+    $('console').classList.remove('error');
+    setStatus(t('status.ok', result.durationMs, (result.body || '').length), 'ok');
+  }
+
+  /* Result properties */
+  const rprops = $('rprops');
+  rprops.innerHTML = '';
+  const entries = Object.entries(result.properties || {});
+  $('cntRProps').textContent = entries.length;
+  entries.forEach(([key, value]) => {
+    const details = document.createElement('details');
+    details.className = 'attachment';
+    details.open = String(value).length > 0 && String(value).length < 4000;
+    const summary = document.createElement('summary');
+    summary.textContent = key + '  (' + String(value).length + ')';
+    const pre = document.createElement('pre');
+    pre.textContent = value;
+    details.append(summary, pre);
+    rprops.appendChild(details);
+  });
+
+  /* MessageLog attachments */
+  const attachments = $('attachments');
+  attachments.innerHTML = '';
+  const list = result.attachments || [];
+  $('cntAttach').textContent = list.length;
+  list.forEach(attachment => {
+    const details = document.createElement('details');
+    details.className = 'attachment';
+    const summary = document.createElement('summary');
+    summary.textContent = attachment.name + '  [' + (attachment.mimeType || '') + ']';
+    const pre = document.createElement('pre');
+    pre.textContent = attachment.content;
+    details.append(summary, pre);
+    attachments.appendChild(details);
+  });
+}
+
+function activate(group, tab) {
+  const tabs = document.querySelector('.tabs[data-group="' + group + '"]');
+  const target = tabs.querySelector('.tab[data-tab="' + tab + '"]');
+  if (target) target.click();
+}
+
+$('btnRun').onclick = run;
+document.addEventListener('keydown', ev => {
+  if ((ev.metaKey || ev.ctrlKey) && ev.key === 'Enter') { ev.preventDefault(); run(); }
+});
+
+/* ---------- Draggable splitters ---------- */
+const LAYOUT_STORE = 'cpi-groovy-tester-layout';
+const GUTTER = 10;      // must match the gutter width in the CSS
+const MIN_COL = 260;    // minimum width per column
+const MIN_ROW = 90;     // minimum height per panel on the right
+let layout = {};
+try { layout = JSON.parse(localStorage.getItem(LAYOUT_STORE) || '{}'); } catch (e) { layout = {}; }
+
+const mainEl = document.querySelector('main');
+const isNarrow = () => window.innerWidth <= 1000;
+
+function applyLayout() {
+  /* The narrow layout is handled by the media query - inline styles must be
+     cleared, otherwise they'd win over the query. */
+  if (isNarrow()) {
+    mainEl.style.gridTemplateColumns = '';
+    $('colRight').style.gridTemplateRows = '';
+    return;
+  }
+  const maxLeft = mainEl.clientWidth - 16 - GUTTER - MIN_COL;
+  if (layout.left && maxLeft > MIN_COL) {
+    mainEl.style.gridTemplateColumns =
+      Math.min(layout.left, maxLeft) + 'px ' + GUTTER + 'px 1fr';
+  } else {
+    mainEl.style.gridTemplateColumns = '';
+  }
+  const colRight = $('colRight');
+  const maxTop = colRight.clientHeight - GUTTER - MIN_ROW;
+  if (layout.top && maxTop > MIN_ROW) {
+    colRight.style.gridTemplateRows =
+      Math.min(layout.top, maxTop) + 'px ' + GUTTER + 'px 1fr';
+  } else {
+    colRight.style.gridTemplateRows = '';
+  }
+}
+
+function makeDraggable(gutter, onMove) {
+  gutter.addEventListener('pointerdown', ev => {
+    if (isNarrow()) return;
+    ev.preventDefault();
+    gutter.setPointerCapture(ev.pointerId);
+    gutter.classList.add('dragging');
+    document.body.style.userSelect = 'none';
+    const move = e => onMove(e);
+    const up = () => {
+      gutter.classList.remove('dragging');
+      document.body.style.userSelect = '';
+      gutter.removeEventListener('pointermove', move);
+      gutter.removeEventListener('pointerup', up);
+      gutter.removeEventListener('pointercancel', up);
+      localStorage.setItem(LAYOUT_STORE, JSON.stringify(layout));
+    };
+    gutter.addEventListener('pointermove', move);
+    gutter.addEventListener('pointerup', up);
+    gutter.addEventListener('pointercancel', up);
+  });
+  gutter.addEventListener('dblclick', () => {
+    if (gutter.id === 'gutterMain') delete layout.left; else delete layout.top;
+    localStorage.setItem(LAYOUT_STORE, JSON.stringify(layout));
+    applyLayout();
+  });
+}
+
+makeDraggable($('gutterMain'), e => {
+  const rect = mainEl.getBoundingClientRect();
+  const inner = rect.width - 16;                       // left/right padding
+  const max = inner - GUTTER - MIN_COL;
+  if (max <= MIN_COL) return;
+  layout.left = Math.round(Math.max(MIN_COL, Math.min(max, e.clientX - rect.left - 8)));
+  mainEl.style.gridTemplateColumns = layout.left + 'px ' + GUTTER + 'px 1fr';
+});
+
+makeDraggable($('gutterRight'), e => {
+  const colRight = $('colRight');
+  const rect = colRight.getBoundingClientRect();
+  const max = rect.height - GUTTER - MIN_ROW;
+  if (max <= MIN_ROW) return;
+  layout.top = Math.round(Math.max(MIN_ROW, Math.min(max, e.clientY - rect.top)));
+  colRight.style.gridTemplateRows = layout.top + 'px ' + GUTTER + 'px 1fr';
+});
+
+window.addEventListener('resize', applyLayout);
+
+/* ---------- Start ---------- */
+initLanguagePicker();
+applyLayout();
+restore();
+if (!$('script').value) $('btnScriptLoad').click();
+if (!$('bodyIn').value) setTimeout(() => $('btnBodyLoad').click(), 150);
+</script>
+</body>
+</html>
