@@ -27,8 +27,14 @@ or a real company.
 
 ## Running it
 
+**macOS/Linux**
 ```bash
 ./run.sh run --config examples/config.json --outdir out
+```
+
+**Windows**
+```bat
+run.bat run --config examples\config.json --outdir out
 ```
 
 Or point the web UI at the files directly (Script: `examples/PerPersonToXml.groovy`,

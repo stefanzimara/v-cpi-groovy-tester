@@ -42,26 +42,49 @@ throwaway class, no stubbing out CPI-specific calls by hand.
 
 - JDK 17 or newer
 - Maven 3.8+
+- macOS, Linux, or Windows
+
+The Java application itself is fully cross-platform. Every command below is
+shown twice: once for macOS/Linux (`build.sh`/`run.sh`/`ui.sh`) and once for
+Windows (`build.bat`/`run.bat`/`ui.bat`, same arguments). One detail that
+trips people up less than you'd expect: forward slashes in paths — as used
+in the macOS/Linux examples — work fine on Windows too, since the JVM
+normalizes them. The Windows examples below use backslashes only because
+that's the native convention, not because it's required.
 
 ## Build
 
+**macOS/Linux**
 ```bash
-./build.sh          # same as: mvn clean package
+./build.sh
 ```
 
-Produces `target/cpi-groovy-tester.jar` plus `target/lib/` with its
-dependencies (deliberately not a fat/uber JAR — see
+**Windows**
+```bat
+build.bat
+```
+
+Both are equivalent to `mvn clean package`. Produces
+`target/cpi-groovy-tester.jar` plus `target/lib/` with its dependencies
+(deliberately not a fat/uber JAR — see
 [Differences from the real CPI runtime](#differences-from-the-real-cpi-runtime)
 for why).
 
 ## Option 1 — command line
 
+**macOS/Linux**
 ```bash
 ./run.sh run --config testdata/config.json --outdir out
 ```
 
+**Windows**
+```bat
+run.bat run --config testdata\config.json --outdir out
+```
+
 or without a config file at all:
 
+**macOS/Linux**
 ```bash
 ./run.sh run \
   --script scripts/OrderToXml.groovy \
@@ -69,6 +92,16 @@ or without a config file at all:
   --property debugLoggingEnabled=true \
   --property currency=USD \
   --out    out/result.xml
+```
+
+**Windows**
+```bat
+run.bat run ^
+  --script scripts\OrderToXml.groovy ^
+  --body   testdata\order.json ^
+  --property debugLoggingEnabled=true ^
+  --property currency=USD ^
+  --out    out\result.xml
 ```
 
 Files written to the output directory:
@@ -84,13 +117,20 @@ Files written to the output directory:
 | `error.log` | only on failure: message + stack trace |
 
 Exit code: `0` = ok, `1` = script error, `2` = invocation error.
-Full option list: `./run.sh --help`
+Full option list: `./run.sh --help` (macOS/Linux) or `run.bat --help` (Windows).
 
 ## Option 2 — web UI
 
+**macOS/Linux**
 ```bash
 ./ui.sh                 # http://localhost:8899, opens a browser tab
 ./ui.sh --port 9000 --no-open
+```
+
+**Windows**
+```bat
+ui.bat                  :: http://localhost:8899, opens a browser tab
+ui.bat --port 9000 --no-open
 ```
 
 Script on the left; Input/Headers/Properties top right; Output/Console/Result
@@ -122,8 +162,14 @@ anywhere on the page.
 The server binds to `127.0.0.1` only by default and restricts file
 load/save to the project directory. To reach it from another machine:
 
+**macOS/Linux**
 ```bash
 ./ui.sh --bind lan          # binds 0.0.0.0
+```
+
+**Windows**
+```bat
+ui.bat --bind lan          :: binds 0.0.0.0
 ```
 
 > **The UI executes arbitrary Groovy and writes files in the project
@@ -147,7 +193,10 @@ execution while the tool is running.
 | `--no-token` | disables the token — only sensible with loopback binding |
 
 On macOS with the firewall enabled, the first external connection triggers a
-one-time prompt asking whether `java` may accept incoming connections.
+one-time prompt asking whether `java` may accept incoming connections. On
+Windows with Defender Firewall enabled, expect the same kind of one-time
+prompt for `java.exe` (or `javaw.exe`); allow it only on private/trusted
+networks.
 
 ## Test case configuration (`config.json`)
 
@@ -220,9 +269,16 @@ Runtime: Groovy 4.0.24 | Script Version 2.x (com.sap.it.script.v2.api.Message)
 
 The Groovy runtime itself is chosen at build time:
 
+**macOS/Linux**
 ```bash
 ./build.sh              # Groovy 4  (default, matches Script Version 2.x)
 ./build.sh -Pgroovy3    # Groovy 3  (closer to the old generation's 2.4)
+```
+
+**Windows**
+```bat
+build.bat              :: Groovy 4  (default, matches Script Version 2.x)
+build.bat -Pgroovy3    :: Groovy 3  (closer to the old generation's 2.4)
 ```
 
 Groovy 2.4 itself no longer runs on Java 17, hence 3.0.x as the closest
@@ -252,7 +308,8 @@ practical match for old scripts.
 
 ```
 pom.xml                     Maven build (groovy4 default profile, groovy3 alternative)
-build.sh / run.sh / ui.sh   build / CLI / web UI entry points
+build.sh / run.sh / ui.sh   build / CLI / web UI entry points (macOS/Linux)
+build.bat / run.bat / ui.bat  same, for Windows
 scripts/                    Groovy scripts under test
 testdata/                   input files and test case configs
 examples/                   a larger, more realistic example (see its own README)

@@ -12,6 +12,7 @@ integration platform, not a hosted service).
 
 ## Development setup
 
+**macOS/Linux**
 ```bash
 git clone <your fork>
 cd cpi-groovy-tester
@@ -19,6 +20,16 @@ cd cpi-groovy-tester
 ./build.sh -Pgroovy3     # Groovy 3, for testing Script Version 1.x behaviour
 ./run.sh run --config testdata/config.json --outdir out
 ./ui.sh
+```
+
+**Windows**
+```bat
+git clone <your fork>
+cd cpi-groovy-tester
+build.bat               :: Groovy 4 (default)
+build.bat -Pgroovy3     :: Groovy 3, for testing Script Version 1.x behaviour
+run.bat run --config testdata\config.json --outdir out
+ui.bat
 ```
 
 Requires JDK 17+ and Maven 3.8+. No other local dependencies.
@@ -50,6 +61,8 @@ before submitting a change:
 - `./run.sh run --config testdata/config.json --outdir /tmp/check` produces
   the expected output for the bundled example script
 - If you touched the UI, click through the affected feature in a browser
+
+(On Windows, substitute `build.bat` / `run.bat` for the two commands above.)
 
 ## Code style
 
