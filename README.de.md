@@ -54,6 +54,31 @@ wie in den macOS/Linux-Beispielen verwendet — funktionieren auch unter
 Windows, da die JVM sie normalisiert. Die Windows-Beispiele unten nutzen
 Backslashes nur, weil das die native Konvention ist, nicht weil es nötig wäre.
 
+<details>
+<summary>Windows: Java und Maven installieren</summary>
+
+Falls `java` oder `mvn` in einem frischen Terminal nicht erkannt werden:
+
+1. JDK 17+ installieren, falls `java -version` fehlschlägt — z.B.
+   [Eclipse Temurin](https://adoptium.net) oder der
+   [Microsoft Build of OpenJDK](https://learn.microsoft.com/java/openjdk/download).
+   Der Installer bietet meist an, `JAVA_HOME` zu setzen und sich selbst zum
+   `PATH` hinzuzufügen — annehmen.
+2. Maven installieren, falls `mvn -version` fehlschlägt:
+   - `winget install Apache.Maven` (Windows 10/11 mit winget), oder
+   - das Binary-ZIP von
+     [maven.apache.org/download.cgi](https://maven.apache.org/download.cgi)
+     laden, entpacken und den `bin`-Ordner zur `PATH`-Umgebungsvariable
+     hinzufügen.
+3. Ein **neues** Terminalfenster öffnen — `PATH`-Änderungen gelten nicht für
+   bereits offene Fenster — und mit `java -version` und `mvn -version`
+   bestätigen.
+
+`build.bat`/`run.bat`/`ui.bat` prüfen beides und verweisen bei Bedarf hierher,
+statt eine nackte "nicht erkannt"-Fehlermeldung durchzureichen.
+
+</details>
+
 ## Bauen
 
 **macOS/Linux**

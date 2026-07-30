@@ -52,6 +52,30 @@ in the macOS/Linux examples — work fine on Windows too, since the JVM
 normalizes them. The Windows examples below use backslashes only because
 that's the native convention, not because it's required.
 
+<details>
+<summary>Windows: installing Java and Maven</summary>
+
+If `java` or `mvn` aren't recognized in a fresh terminal:
+
+1. Install a JDK 17+ if `java -version` fails — e.g.
+   [Eclipse Temurin](https://adoptium.net) or the
+   [Microsoft Build of OpenJDK](https://learn.microsoft.com/java/openjdk/download).
+   The installer usually offers to set `JAVA_HOME` and add itself to `PATH`;
+   accept that.
+2. Install Maven if `mvn -version` fails:
+   - `winget install Apache.Maven` (Windows 10/11 with winget), or
+   - download the binary zip from
+     [maven.apache.org/download.cgi](https://maven.apache.org/download.cgi),
+     extract it, and add its `bin` folder to your `PATH` environment variable.
+3. Open a **new** terminal window — `PATH` changes don't apply to windows
+   that were already open — and confirm with `java -version` and
+   `mvn -version`.
+
+`build.bat`/`run.bat`/`ui.bat` check for both and print a pointer back here
+if either is missing, instead of a bare "not recognized" error.
+
+</details>
+
 ## Build
 
 **macOS/Linux**
