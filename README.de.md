@@ -32,6 +32,10 @@ CPI-spezifischen Aufrufen.
 - **Keine Netzwerkaufrufe, keine Telemetrie.** Alles läuft auf dem eigenen
   Rechner — auch der mitgelieferte Editor, es wird nichts von einem CDN geladen.
 
+Eine vollständige, nach Bereichen sortierte Auflistung aller Funktionen steht
+in **[FEATURES.de.md](FEATURES.de.md)**. Dieses README erklärt das Wie, jene
+Datei zeigt das Was.
+
 ## Inhalt
 
 - [Voraussetzungen](#voraussetzungen)

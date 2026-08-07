@@ -29,6 +29,10 @@ throwaway class, no stubbing out CPI-specific calls by hand.
 - **No network calls, no telemetry.** Everything runs on your machine —
   including the bundled editor, so there is nothing to load from a CDN.
 
+A complete, area-by-area list of what the tool can do is in
+**[FEATURES.md](FEATURES.md)**. This README is the how-to; that file is the
+what-is-there.
+
 ## Table of contents
 
 - [Requirements](#requirements)
