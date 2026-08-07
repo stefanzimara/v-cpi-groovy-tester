@@ -42,6 +42,15 @@ public class RunResult {
     /** Erkannte Script-API-Generation anhand der Signatur von processData(..). */
     public String apiVersion = "";
 
+    /** Aufgezeichneter Ablauf, sofern {@code RunConfig.trace} gesetzt war. */
+    public List<TraceRecorder.Step> trace = new ArrayList<TraceRecorder.Step>();
+
+    /** Tatsaechlich ausgefuehrte Statements - kann groesser sein als {@code trace.size()}. */
+    public int traceExecuted;
+
+    /** true, wenn die Aufzeichnung am Limit abgeschnitten wurde. */
+    public boolean traceTruncated;
+
     public static class AttachmentView {
         public String name;
         public String mimeType;

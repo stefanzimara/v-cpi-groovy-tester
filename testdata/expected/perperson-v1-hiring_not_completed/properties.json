@@ -1,0 +1,8 @@
+{
+    "debugLoggingEnabled": "true",
+    "processDebugLog": "processPerPersonEntity\nprocessPerPersonEntity processing:\npersonIdExternal is 10012345\n\n-----> xmlResponse: \n\nincoming message body\nbody:\n\n<Records><Record><PersNr></PersNr><BirthDate></BirthDate><CostCenter></CostCenter><Manager></Manager><StartDate></StartDate><EndDate></EndDate><Company></Company><LocationCode></LocationCode><DepartmentCode></DepartmentCode><DepartmentName></DepartmentName><DepartmentNameShort></DepartmentNameShort><Lastname></Lastname><Firstname></Firstname><Gender></Gender><NetworkAccess></NetworkAccess><Language></Language><PersType></PersType><EmployeeType></EmployeeType><JobTitle></JobTitle><AHVNummer></AHVNummer><FirstnameIT></FirstnameIT><LastnameIT></LastnameIT></Record></Records>\n\noutgoing message body\n<Records><Record><PersNr></PersNr><BirthDate></BirthDate><CostCenter></CostCenter><Manager></Manager><StartDate></StartDate><EndDate></EndDate><Company></Company><LocationCode></LocationCode><DepartmentCode></DepartmentCode><DepartmentName></DepartmentName><DepartmentNameShort></DepartmentNameShort><Lastname></Lastname><Firstname></Firstname><Gender></Gender><NetworkAccess></NetworkAccess><Language></Language><PersType></PersType><EmployeeType></EmployeeType><JobTitle></JobTitle><AHVNummer></AHVNummer><FirstnameIT></FirstnameIT><LastnameIT></LastnameIT></Record></Records>\n",
+    "picklistMappings": "{\"picklistMappings\":[]}",
+    "ForceCutOffDateEntry": "",
+    "currentEmployeeNo": "10012345",
+    "IgnoreMessageForLog": "no"
+}

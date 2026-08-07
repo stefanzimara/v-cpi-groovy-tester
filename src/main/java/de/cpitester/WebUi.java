@@ -111,6 +111,7 @@ public final class WebUi {
         HttpServer server = HttpServer.create(new InetSocketAddress(bindAddress, port), 0);
         server.createContext("/", guarded(new StaticHandler(), false));
         server.createContext("/api/run", guarded(new RunHandler(), true));
+        server.createContext("/api/check", guarded(new CheckHandler(), true));
         server.createContext("/api/list", guarded(new ListHandler(), false));
         server.createContext("/api/load", guarded(new LoadHandler(), false));
         server.createContext("/api/save", guarded(new SaveHandler(), true));
@@ -275,6 +276,8 @@ public final class WebUi {
                 config.body = Json.stringAt(request, "body", "");
                 config.entryMethod = Json.stringAt(request, "entryMethod", "processData");
                 config.messageLogEnabled = Json.boolAt(request, "messageLogEnabled", true);
+                config.trace = Json.boolAt(request, "trace", false);
+                config.traceMaxSteps = Json.intAt(request, "traceMaxSteps", 5000, 1, 20000);
                 config.headers.putAll(Json.mapAt(request, "headers"));
                 config.properties.putAll(Json.mapAt(request, "properties"));
                 Map<String, Object> credentials = Json.mapAt(request, "credentials");
@@ -312,6 +315,9 @@ public final class WebUi {
                 response.put("durationMs", result.durationMs);
                 response.put("groovyVersion", result.groovyVersion);
                 response.put("apiVersion", result.apiVersion);
+                response.put("trace", traceView(result.trace));
+                response.put("traceExecuted", result.traceExecuted);
+                response.put("traceTruncated", result.traceTruncated);
                 sendJson(exchange, 200, response);
             } catch (Exception e) {
                 Map<String, Object> response = new LinkedHashMap<String, Object>();
@@ -322,6 +328,59 @@ public final class WebUi {
                 response.put("console", "");
                 sendJson(exchange, 200, response);
             }
+        }
+    }
+
+    /**
+     * Prueft das Script, ohne es auszufuehren, und liefert die Befunde fuer
+     * die Live-Anzeige im Editor.
+     *
+     * Steht bewusst hinter demselben CSRF-Schutz wie /api/run: die Pruefung
+     * kompiliert bis CANONICALIZATION, und dabei laufen AST-Transformationen -
+     * also fremder Code. "Nur pruefen" ist hier nicht gleichbedeutend mit
+     * "harmlos".
+     */
+    private static class CheckHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                send(exchange, 405, "text/plain; charset=utf-8", "POST erwartet".getBytes(StandardCharsets.UTF_8));
+                return;
+            }
+            Map<String, Object> response = new LinkedHashMap<String, Object>();
+            try {
+                Map<String, Object> request = Json.parseObject(readBody(exchange));
+
+                CodeInspector.Context context = new CodeInspector.Context();
+                context.scriptName = Json.stringAt(request, "scriptName", "Script.groovy");
+                context.entryMethod = Json.stringAt(request, "entryMethod", "processData");
+                context.knownHeaders.addAll(Json.mapAt(request, "headers").keySet());
+                context.knownProperties.addAll(Json.mapAt(request, "properties").keySet());
+
+                List<CodeInspector.Finding> findings =
+                        new CodeInspector().inspect(Json.stringAt(request, "script", ""), context);
+
+                List<Object> views = new ArrayList<Object>();
+                for (CodeInspector.Finding finding : findings) {
+                    Map<String, Object> view = new LinkedHashMap<String, Object>();
+                    view.put("rule", finding.rule);
+                    view.put("severity", finding.severity);
+                    view.put("line", finding.line);
+                    view.put("column", finding.column);
+                    view.put("endLine", finding.endLine);
+                    view.put("endColumn", finding.endColumn);
+                    view.put("message", finding.message);
+                    view.put("params", finding.params);
+                    views.add(view);
+                }
+                response.put("ok", true);
+                response.put("findings", views);
+            } catch (Exception e) {
+                response.put("ok", false);
+                response.put("error", "Pruefung fehlgeschlagen: " + e);
+                response.put("findings", new ArrayList<Object>());
+            }
+            sendJson(exchange, 200, response);
         }
     }
 
@@ -408,6 +467,33 @@ public final class WebUi {
         return candidate.startsWith(root) ? candidate : null;
     }
 
+    /**
+     * Die Aufzeichnung wird von Hand in Maps uebersetzt statt einen
+     * Objekt-Serialisierer zu bemuehen - so steht hier, was tatsaechlich ueber
+     * die Leitung geht.
+     */
+    private static List<Object> traceView(List<TraceRecorder.Step> steps) {
+        List<Object> result = new ArrayList<Object>();
+        for (TraceRecorder.Step step : steps) {
+            List<Object> changes = new ArrayList<Object>();
+            for (TraceRecorder.Change change : step.changes) {
+                Map<String, Object> view = new LinkedHashMap<String, Object>();
+                view.put("kind", change.kind);
+                view.put("name", change.name);
+                view.put("before", change.before);
+                view.put("after", change.after);
+                changes.add(view);
+            }
+            Map<String, Object> view = new LinkedHashMap<String, Object>();
+            view.put("line", step.line);
+            view.put("variables", step.variables);
+            view.put("changes", changes);
+            view.put("console", step.console);
+            result.add(view);
+        }
+        return result;
+    }
+
     private static Map<String, Object> stringify(Map<String, Object> source) {
         Map<String, Object> result = new LinkedHashMap<String, Object>();
         for (Map.Entry<String, Object> entry : source.entrySet()) {
@@ -471,6 +557,9 @@ public final class WebUi {
         }
         if (path.endsWith(".js")) {
             return "application/javascript; charset=utf-8";
+        }
+        if (path.endsWith(".txt")) {
+            return "text/plain; charset=utf-8";
         }
         if (path.endsWith(".png")) {
             return "image/png";

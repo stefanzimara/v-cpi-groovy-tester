@@ -55,6 +55,22 @@ public final class Json {
         return value == null ? defaultValue : String.valueOf(value);
     }
 
+    /** Liest eine Ganzzahl und klemmt sie in die erlaubte Spanne. */
+    public static int intAt(Map<String, Object> source, String key, int defaultValue, int min, int max) {
+        Object value = source == null ? null : source.get(key);
+        int result = defaultValue;
+        if (value instanceof Number) {
+            result = ((Number) value).intValue();
+        } else if (value != null) {
+            try {
+                result = Integer.parseInt(String.valueOf(value).trim());
+            } catch (NumberFormatException ignored) {
+                result = defaultValue;
+            }
+        }
+        return Math.max(min, Math.min(max, result));
+    }
+
     public static boolean boolAt(Map<String, Object> source, String key, boolean defaultValue) {
         Object value = source == null ? null : source.get(key);
         if (value instanceof Boolean) {

@@ -33,4 +33,14 @@ public class RunConfig {
     public boolean messageLogEnabled = true;
 
     public Charset charset = StandardCharsets.UTF_8;
+
+    /**
+     * Zeichnet den Ablauf Statement fuer Statement auf (siehe
+     * {@link TraceRecorder}). Kostet Laufzeit und Speicher, deshalb bewusst
+     * abschaltbar und nicht der Normalfall.
+     */
+    public boolean trace = false;
+
+    /** Obergrenze fuer aufgezeichnete Schritte - eine grosse Schleife sprengt sonst alles. */
+    public int traceMaxSteps = 5000;
 }

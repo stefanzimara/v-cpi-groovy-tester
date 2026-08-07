@@ -1,6 +1,5 @@
 package de.cpitester;
 
-import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -51,7 +50,8 @@ public class ScriptRunner {
         ITApiFactory.reset();
         ITApiFactory.registerService(SecureStoreService.class, secureStore);
 
-        ByteArrayOutputStream consoleBuffer = new ByteArrayOutputStream();
+        TraceRecorder.ConsoleBuffer consoleBuffer = new TraceRecorder.ConsoleBuffer();
+        TraceRecorder recorder = null;
 
         synchronized (CONSOLE_LOCK) {
             PrintStream originalOut = System.out;
@@ -64,6 +64,11 @@ public class ScriptRunner {
 
                 CompilerConfiguration compilerConfiguration = new CompilerConfiguration();
                 compilerConfiguration.setSourceEncoding("UTF-8");
+                if (config.trace) {
+                    // Muss vor dem Parsen stehen - der Customizer greift
+                    // waehrend des Kompilierens, nicht danach.
+                    compilerConfiguration.addCompilationCustomizers(new TraceTransformer());
+                }
                 classLoader = new GroovyClassLoader(
                         Thread.currentThread().getContextClassLoader(), compilerConfiguration);
 
@@ -90,6 +95,13 @@ public class ScriptRunner {
                 Object instance = scriptClass.getDeclaredConstructor().newInstance();
                 if (instance instanceof Script) {
                     ((Script) instance).setBinding(binding);
+                }
+
+                if (config.trace) {
+                    // Erst hier, nicht frueher: die Message existiert seit
+                    // createMessage(..), und der Ausgangszustand gehoert als
+                    // Vergleichsbasis in die Aufzeichnung.
+                    recorder = TraceRecorder.start(message, consoleBuffer, config.traceMaxSteps);
                 }
 
                 Object returned = org.codehaus.groovy.runtime.InvokerHelper
@@ -120,6 +132,14 @@ public class ScriptRunner {
             } finally {
                 System.out.flush();
                 System.err.flush();
+                TraceRecorder.stop();
+                if (recorder != null) {
+                    // Auch bei Abbruch mitgeben - dort steht ja gerade, wie es
+                    // bis zum Fehler gelaufen ist.
+                    result.trace = recorder.getSteps();
+                    result.traceExecuted = recorder.getExecuted();
+                    result.traceTruncated = recorder.isTruncated();
+                }
                 System.setOut(originalOut);
                 System.setErr(originalErr);
                 if (classLoader != null) {
@@ -197,7 +217,7 @@ public class ScriptRunner {
     }
 
     /** Groovy leitet aus dem Namen einen Klassennamen ab - nur sichere Zeichen zulassen. */
-    private static String sanitizeScriptName(String name) {
+    static String sanitizeScriptName(String name) {
         if (name == null || name.trim().isEmpty()) {
             return "Script.groovy";
         }

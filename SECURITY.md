@@ -20,7 +20,8 @@ limits, network egress control), which is out of scope here.
 |---|---|
 | Network exposure | Server binds to `127.0.0.1` by default. `--bind` to a non-loopback address requires an access token (auto-generated unless `--token` is given). |
 | Path traversal | File load/save (`/api/load`, `/api/save`) resolve and normalize against the project root and refuse anything that escapes it. |
-| "localhost CSRF" (a hostile page open in another tab silently triggering code execution on this tool) | `POST /api/run` and `POST /api/save` require a custom request header (`X-Tester-Csrf`) that neither an HTML `<form>` nor a cross-origin `fetch`/`XHR` can set without a CORS preflight this server does not answer. This protection is active even in the default loopback-only mode without a token. |
+| "localhost CSRF" (a hostile page open in another tab silently triggering code execution on this tool) | `POST /api/run`, `POST /api/save` and `POST /api/check` require a custom request header (`X-Tester-Csrf`) that neither an HTML `<form>` nor a cross-origin `fetch`/`XHR` can set without a CORS preflight this server does not answer. This protection is active even in the default loopback-only mode without a token. |
+| Code execution through the code inspector | `/api/check` never *runs* the script, but it compiles it up to Groovy's `CANONICALIZATION` phase, and AST transformations are arbitrary code. It is therefore treated exactly like `/api/run`: same token check, same CSRF header, never reachable without them. |
 | Memory exhaustion via oversized requests | Request bodies are capped (25 MB) before parsing. |
 
 ## What is on you

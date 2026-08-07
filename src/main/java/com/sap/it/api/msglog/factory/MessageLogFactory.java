@@ -1,7 +1,8 @@
 package com.sap.it.api.msglog.factory;
 
-import com.sap.gateway.ip.core.customdev.util.Message;
 import com.sap.it.api.msglog.MessageLog;
+
+import de.cpitester.MessageSupport;
 
 /**
  * Lokaler Nachbau von com.sap.it.api.msglog.factory.MessageLogFactory.
@@ -15,7 +16,18 @@ public class MessageLogFactory {
     private final MessageLog messageLog = new MessageLog();
     private boolean enabled = true;
 
-    public MessageLog getMessageLog(Message message) {
+    /**
+     * Nimmt bewusst {@link MessageSupport} entgegen, nicht eine der beiden
+     * konkreten Message-Klassen: Scripte beider CPI-Generationen rufen
+     * getMessageLog(message) mit ihrer jeweils eigenen Message-Klasse auf, und
+     * auf dem Tenant funktioniert beides. Hier stand frueher die Klasse der
+     * Version 1.x, wodurch jedes Script der Version 2.x mit einer
+     * MissingMethodException scheiterte.
+     *
+     * Der Parameter wird nicht ausgewertet - er existiert nur, damit die
+     * Aufrufform der echten API entspricht.
+     */
+    public MessageLog getMessageLog(MessageSupport message) {
         return enabled ? messageLog : null;
     }
 
