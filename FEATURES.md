@@ -222,6 +222,27 @@ zu vorher.
   Picklist-Lookups — vier Testfixtures für unterschiedliche Auswahlfälle,
   alle Daten synthetisch.
 
+## Rauchtest (`smoke.sh` / `smoke.bat`)
+
+- Fährt **jedes mitgelieferte Beispiel gegen jede Testeingabe** über die CLI —
+  zehn Fälle, beide Script-Generationen, vier PerPerson-Fixtures.
+- Vergleicht `output.*`, `properties.json` und `headers.json` mit den
+  Sollständen unter `testdata/expected/` (rund 160 KB). Fängt damit zwei
+  Fehlerklassen: ein Beispiel läuft gar nicht mehr, oder seine Ausgabe hat
+  sich still verändert. Bei Abweichung wird der Diff direkt angezeigt.
+- `--profiles` baut Groovy 4 und Groovy 3 und prüft beide. Die Ausgaben sind
+  über beide Profile hinweg identisch, deshalb genügt ein Satz Sollstände.
+- `--update` schreibt die Sollstände nach beabsichtigten Änderungen neu.
+- Nicht verglichen werden Attachments (ihre Dateinamen enthalten einen
+  Zeitstempel aus dem Laufzeitpunkt) und `console.log` (kann Pfade des
+  ausführenden Rechners enthalten).
+- Exit-Code `0`/`1` — direkt in CI verwendbar.
+
+Entstanden aus einem konkreten Anlass: `MessageLogFactory.getMessageLog(..)`
+war auf die Message-Klasse der Version 1.x festgelegt, wodurch jedes Script
+der Version 2.x scheiterte — inklusive des mitgelieferten Standardbeispiels.
+Unentdeckt blieb das nur, weil nichts die Beispiele automatisch ausführte.
+
 ## Projektqualität / Open Source
 
 - Lizenz: GPL-3.0.

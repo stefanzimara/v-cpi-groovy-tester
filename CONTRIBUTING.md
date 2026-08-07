@@ -54,15 +54,31 @@ change; the picker, detection and fallback all read from these two.
 
 ## Tests
 
-There is no automated test suite yet (contributions welcome). At minimum,
-before submitting a change:
+`smoke.sh` (`smoke.bat` on Windows) runs every bundled example against every
+test fixture and compares the output against the expected files checked in
+under `testdata/expected/`. It catches both an example that stops running at
+all and one whose output silently changed.
+
+```bash
+./smoke.sh              # check against the expected files
+./smoke.sh --profiles   # build Groovy 4 and Groovy 3 and check both
+./smoke.sh --update     # rewrite the expected files after an intended change
+```
+
+Before submitting a change:
 
 - `./build.sh` succeeds
-- `./run.sh run --config testdata/config.json --outdir /tmp/check` produces
-  the expected output for the bundled example script
+- `./smoke.sh` is green — `--profiles` if you touched anything runtime-related
 - If you touched the UI, click through the affected feature in a browser
 
-(On Windows, substitute `build.bat` / `run.bat` for the two commands above.)
+If a change is *supposed* to alter the output, run `./smoke.sh --update` and
+include the updated files in the pull request. Review that diff carefully:
+an unintended change looks exactly like an intended one there.
+
+There are no unit tests yet (contributions welcome). The most useful place to
+start would be `de.cpitester.CodeInspector` — its rules are pure functions
+(source in, findings out) and are the part most likely to quietly stop
+working.
 
 ## Code style
 
@@ -70,8 +86,10 @@ before submitting a change:
   introducing a new one.
 - Comments explain *why*, not *what* — skip comments that just restate the
   code.
-- No new external dependencies for the UI (`src/main/resources/ui/index.html`
-  stays a single self-contained file, no CDN scripts).
+- No new external dependencies for the UI. `index.html` stays one
+  self-contained file, and anything it loads is bundled under
+  `src/main/resources/ui/assets/` — never from a CDN, so the tool keeps
+  working without an internet connection.
 
 ## License
 

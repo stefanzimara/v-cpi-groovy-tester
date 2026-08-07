@@ -1,0 +1,7 @@
+<Order>
+  <OrderId>ORD-1001</OrderId>
+  <Customer>Jane Doe</Customer>
+  <ItemCount>2</ItemCount>
+  <Total currency="EUR">89.48</Total>
+  <Source>webshop</Source>
+</Order>

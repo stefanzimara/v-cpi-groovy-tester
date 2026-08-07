@@ -436,8 +436,10 @@ nächstliegende Variante für alte Scripte.
 pom.xml                     Maven-Build (Default-Profil groovy4, Alternative groovy3)
 build.sh / run.sh / ui.sh   Bauen / CLI / Weboberflaeche (macOS/Linux)
 build.bat / run.bat / ui.bat  dasselbe, fuer Windows
+smoke.sh / smoke.bat        faehrt alle Beispiele und vergleicht die Ausgabe
 scripts/                    zu testende Groovy-Scripte
 testdata/                   Eingabedateien und Testfall-Konfigurationen
+  expected/                 Sollstaende fuer den Rauchtest
 examples/                   ein groesseres, realistischeres Beispiel (eigenes README)
 out/                        Ergebnisse (wird bei Bedarf angelegt)
 src/main/java/com/sap/...   Nachbau der CPI-APIs (Clean-Room-Reimplementierung)

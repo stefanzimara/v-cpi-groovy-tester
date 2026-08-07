@@ -426,8 +426,10 @@ practical match for old scripts.
 pom.xml                     Maven build (groovy4 default profile, groovy3 alternative)
 build.sh / run.sh / ui.sh   build / CLI / web UI entry points (macOS/Linux)
 build.bat / run.bat / ui.bat  same, for Windows
+smoke.sh / smoke.bat        runs every bundled example and compares the output
 scripts/                    Groovy scripts under test
 testdata/                   input files and test case configs
+  expected/                 expected output for the smoke test
 examples/                   a larger, more realistic example (see its own README)
 out/                        results (created on demand)
 src/main/java/com/sap/...   CPI API mocks (clean-room reimplementation)
