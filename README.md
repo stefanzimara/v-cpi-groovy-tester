@@ -17,9 +17,17 @@ throwaway class, no stubbing out CPI-specific calls by hand.
   (Groovy 4, `com.sap.it.script.v2.api.Message`) — auto-detected per script,
   no manual switching.
 - **CLI and web UI**, same engine underneath. The CLI suits scripting/CI; the
-  UI suits interactive editing with a resizable, pretty-printing, bilingual
-  (EN/DE, extensible) interface and inline help.
-- **No network calls, no telemetry.** Everything runs on your machine.
+  UI suits interactive editing — syntax-highlighting editor, resizable panels,
+  pretty-printing, bilingual (EN/DE, extensible) and with inline help.
+- **[Catches problems while you type](#code-inspector)** — a code inspector
+  compiles the script without running it and applies CPI-specific rules on top:
+  a body read twice, a MessageLog used without a null check, a property your
+  script reads that the test case never sets, a hard-coded password.
+- **[Records a run step by step](#trace-stepping-through-a-run)** — scrub back
+  and forth through the execution afterwards and see the variables at each
+  point, instead of littering the script with `println` to find out.
+- **No network calls, no telemetry.** Everything runs on your machine —
+  including the bundled editor, so there is nothing to load from a CDN.
 
 ## Table of contents
 
@@ -459,6 +467,22 @@ This project is not affiliated with, sponsored by, or endorsed by SAP. "SAP",
 bundled runtime mocks are a clean-room reimplementation written for local
 testing only, based on the publicly observable Script API surface — they
 contain no SAP source code.
+
+### Third-party components
+
+| Component | License | Where |
+|---|---|---|
+| [CodeMirror 5](https://codemirror.net/5/) — the editor in the web UI | MIT | committed under `src/main/resources/ui/assets/codemirror/`, license text next to it |
+| Apache Groovy (`groovy`, `-json`, `-xml`, `-sql`, `-templates`, `-dateutil`) | Apache-2.0 | Maven dependency |
+| Apache Commons Lang3, Commons IO | Apache-2.0 | Maven dependency |
+| json-lib, and what it pulls in (ezmorph, Commons BeanUtils/Collections/Lang/Logging) | Apache-2.0 | Maven dependency |
+
+CodeMirror is committed to this repository rather than loaded from a CDN, so
+the UI keeps working without an internet connection and nothing about your
+scripts leaves your machine. Its license text sits next to the files.
+
+Everything above is permissively licensed and compatible with this project's
+GPL-3.0. `mvn dependency:list` shows the resolved set at any time.
 
 ---
 

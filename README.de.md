@@ -18,10 +18,19 @@ CPI-spezifischen Aufrufen.
   (Groovy 4, `com.sap.it.script.v2.api.Message`) — werden pro Script
   automatisch erkannt, kein manuelles Umschalten.
 - **CLI und Weboberfläche**, dieselbe Engine darunter. Die CLI eignet sich
-  fürs Skripten/CI, die UI fürs interaktive Arbeiten mit anpassbaren
-  Bereichen, Pretty-Print, zweisprachiger (DE/EN, erweiterbarer) Oberfläche
-  und eingebauter Hilfe.
-- **Keine Netzwerkaufrufe, keine Telemetrie.** Alles läuft auf dem eigenen Rechner.
+  fürs Skripten/CI, die UI fürs interaktive Arbeiten — Editor mit
+  Syntaxhervorhebung, anpassbare Bereiche, Pretty-Print, zweisprachig
+  (DE/EN, erweiterbar) und mit eingebauter Hilfe.
+- **[Findet Probleme schon beim Tippen](#code-inspector)** — ein Code
+  Inspector kompiliert das Script, ohne es auszuführen, und legt
+  CPI-spezifische Regeln darüber: zweimal gelesener Body, MessageLog ohne
+  Null-Prüfung, eine Property, die das Script liest, die der Testfall aber
+  nie setzt, ein fest verdrahtetes Passwort.
+- **[Zeichnet einen Lauf Schritt für Schritt auf](#trace-den-ablauf-durchspulen)**
+  — danach lässt sich der Ablauf vor- und zurückspulen, samt Variablenwerten
+  an jeder Stelle, statt das Script mit `println` zu pflastern.
+- **Keine Netzwerkaufrufe, keine Telemetrie.** Alles läuft auf dem eigenen
+  Rechner — auch der mitgelieferte Editor, es wird nichts von einem CDN geladen.
 
 ## Inhalt
 
@@ -470,6 +479,22 @@ Bezeichnungen sind Marken der SAP SE. Die mitgelieferten Laufzeit-Nachbauten
 sind ein Clean-Room-Nachbau, ausschließlich für lokale Tests geschrieben, auf
 Basis der öffentlich beobachtbaren Script-API-Oberfläche — sie enthalten
 keinen SAP-Quellcode.
+
+### Fremdkomponenten
+
+| Komponente | Lizenz | Wo |
+|---|---|---|
+| [CodeMirror 5](https://codemirror.net/5/) — der Editor der Weboberfläche | MIT | im Repository unter `src/main/resources/ui/assets/codemirror/`, Lizenztext daneben |
+| Apache Groovy (`groovy`, `-json`, `-xml`, `-sql`, `-templates`, `-dateutil`) | Apache-2.0 | Maven-Abhängigkeit |
+| Apache Commons Lang3, Commons IO | Apache-2.0 | Maven-Abhängigkeit |
+| json-lib samt Mitgezogenem (ezmorph, Commons BeanUtils/Collections/Lang/Logging) | Apache-2.0 | Maven-Abhängigkeit |
+
+CodeMirror liegt bewusst im Repository statt auf einem CDN — so funktioniert
+die Oberfläche ohne Internetzugang, und nichts aus deinen Scripten verlässt
+den eigenen Rechner. Der Lizenztext liegt neben den Dateien.
+
+Alles davon ist permissiv lizenziert und mit der GPL-3.0 dieses Projekts
+vereinbar. `mvn dependency:list` zeigt jederzeit den aufgelösten Stand.
 
 ---
 
