@@ -58,13 +58,98 @@ API-Oberfläche — kein SAP-Quellcode.
   `attachments/NN_*.txt`, bei Fehlern zusätzlich `error.log`.
 - Exit-Codes: `0` ok, `1` Script-Fehler, `2` Aufruffehler — scriptbar/CI-tauglich.
 
+## Code Inspector (Live-Prüfung beim Tippen)
+
+Prüft das Script im Editor, **ohne es auszuführen**, und meldet Probleme mit
+Zeile und Spalte — als Punkt im Gutter, gepunktete Unterstreichung im Code und
+Liste unterhalb des Editors. Ein Klick auf einen Eintrag springt zur Stelle.
+
+- **Compiler-Ebene:** Groovy kompiliert bis Phase `CANONICALIZATION` — das
+  deckt Syntaxfehler, nicht auflösbare Imports/Klassen und die
+  Compiler-Warnungen ab, also alles, woran auch der echte Lauf scheitern
+  würde. Erzeugt wird dabei kein Bytecode.
+- **CPI-Regeln** auf dem AST — Stolperfallen, die ein normaler
+  Groovy-Compiler nicht kennen kann:
+
+  | Regel | Meldet |
+  |---|---|
+  | `entryMissing` | keine Methode `processData(Message)` — der Runner hat nichts zum Aufrufen |
+  | `entryReturnsVoid` | Einstiegsmethode als `void` deklariert statt die Message zurückzugeben |
+  | `entryParamType` | Einstiegsmethode nimmt keine Message entgegen |
+  | `apiVersionMix` | beide Message-Generationen gleichzeitig importiert |
+  | `bodyReadTwice` | ungetypter Body mehrfach gelesen — in CPI ein `InputStream`, ab dem zweiten Lesen leer |
+  | `bodyUntyped` | `getBody()` ohne Typ statt `getBody(java.lang.String)` |
+  | `setBodyMissing` | Script setzt den Body nie |
+  | `messageLogNullCheck` | MessageLog ohne Null-Prüfung benutzt — `getMessageLog(..)` liefert `null`, wenn das Tenant-Logging aus ist |
+  | `unknownProperty` / `unknownHeader` | Name wird gelesen, ist im aktuellen Testfall aber nicht gesetzt |
+  | `hardcodedSecret` | Passwort/Token als Literal im Code statt aus dem Secure Store |
+  | `forbiddenSleep` / `forbiddenExit` / `fileAccess` | `Thread.sleep`, `System.exit`, `java.io.File` — auf dem Tenant unzulässig bzw. wirkungslos |
+  | `emptyCatch` | leerer `catch`-Block, Fehler verschwindet spurlos |
+  | `printlnUsage` | `println` erreicht auf dem Tenant niemanden |
+
+- Die Regeln kennen den **aktuellen Testfall**: eine Property, die das Script
+  liest, die aber weder in den Properties der UI steht noch vom Script selbst
+  gesetzt wird, wird als Hinweis gemeldet — und verschwindet, sobald man sie
+  anlegt.
+- Drei Stufen: Fehler (rot), Warnung (orange), Hinweis (blau), mit Zähler in
+  der Script-Leiste. Per Knopf abschaltbar, die Wahl wird gemerkt.
+- Bewusst konservativ ausgelegt: lieber eine Falle nicht melden als ständig
+  falschen Alarm schlagen. Ein Linter, dem man nicht glaubt, wird abgeschaltet.
+- Meldungen sind zweisprachig; die Texte des Groovy-Compilers bleiben im
+  Original.
+
+## Trace (aufgezeichneter Ablauf statt Debug-Ausgaben)
+
+Der Knopf **⏱ Trace** führt das Script aus und schreibt dabei jeden Schritt
+mit. Danach lässt sich der Ablauf im Trace-Tab vor- und zurückspulen — man
+sieht an jeder Stelle, was das Script gerade tut, ohne dafür `println` oder
+ein Debug-Log einbauen zu müssen.
+
+- Pro ausgeführtem Statement festgehalten: **Zeilennummer**, die dort
+  **sichtbaren lokalen Variablen** mit ihren Werten, die **Änderungen am
+  Message-Zustand** (Property/Header/Body, jeweils vorher → nachher) und die
+  **Konsolenausgabe dieses Schritts**.
+- Die aktuelle Zeile wird im Editor hervorgehoben und angesprungen.
+- Filter **„nur Schritte, die etwas ändern"** — in einer Schleife sind das
+  sonst überwiegend Wiederholungen, durch die man sich durchklicken müsste.
+- Bei einem Abbruch endet die Aufzeichnung an der Stelle, an der es geknallt
+  ist, samt Variablenständen unmittelbar davor. Genau dort steht meist die
+  Antwort, warum es geknallt hat.
+- Aufgezeichnet werden **Änderungen, nicht der volle Zustand pro Schritt** —
+  sonst wäre das Protokoll ein Vielfaches der Nutzdaten.
+- Schrittlimit (Standard 5000) gegen Aufzeichnungen aus großen Schleifen;
+  wird es erreicht, sagt die Anzeige, wie viele Schritte tatsächlich liefen
+  und ab wo etwas fehlt.
+
+**Wie es funktioniert:** Ein `CompilationCustomizer` (`TraceTransformer`)
+hängt in der Compiler-Phase `CONVERSION` vor jedes Statement einen Aufruf des
+`TraceRecorder`. Zu diesem Zeitpunkt ist der AST geparst, aber die Variablen
+sind noch nicht aufgelöst — der eingefügte Code durchläuft danach dieselben
+Phasen wie handgeschriebener und braucht keine Sonderbehandlung. Welche
+Variablen an einer Stelle sichtbar sind, führt der Transformer selbst Buch
+(eine erst weiter unten deklarierte Variable darf nicht auftauchen, sonst
+läuft der erzeugte Code in eine `MissingPropertyException`).
+
+Damit ist echte Variableninspektion möglich **ohne zweiten Prozess und ohne
+JDWP/JDI**. Erfasst werden auch Closure-Rümpfe (samt implizitem `it`),
+Schleifenvariablen und Catch-Variablen. Eingefügt wird immer *vor* einem
+Statement, nie danach — sonst wäre das letzte Statement einer Methode nicht
+mehr das letzte und Groovys impliziter Rückgabewert ein anderer.
+
+Ohne `⏱ Trace` wird nichts instrumentiert: ein normaler Lauf ist byte-gleich
+zu vorher.
+
 ## Weboberfläche (`ui.sh` / `ui.bat`)
 
+- **Vollwertiger Code-Editor** (CodeMirror, lokal im JAR — kein CDN, läuft
+  offline): Groovy-Syntaxhervorhebung, Zeilennummern, Klammer-Matching und
+  -Vervollständigung, aktive Zeile hervorgehoben, folgt dem Hell-/Dunkel-Schema
+  der übrigen Oberfläche.
 - Script-Editor mit Laden/Speichern direkt aus/in den Projektordner.
 - Getrennte Tabs für Input, Header, Properties (Key/Value-Editor mit
   Hinzufügen/Entfernen einzelner Zeilen).
-- Ergebnis-Tabs: Output, Console, Ergebnis-Properties, Attachments — je mit
-  Zähler-Badge.
+- Ergebnis-Tabs: Output, Console, Ergebnis-Properties, Attachments, Trace —
+  je mit Zähler-Badge.
 - **Größenverstellbare Bereiche**: ziehbare Trenner zwischen Script/rechter
   Spalte und zwischen Input/Output, Doppelklick setzt zurück, Aufteilung
   wird gemerkt.
@@ -101,10 +186,14 @@ API-Oberfläche — kein SAP-Quellcode.
   erzeugt, außer `--token`/`--no-token` gesetzt).
 - Token muss als `?t=...` oder Header `X-Tester-Token` mitgeschickt werden;
   ungültige/fehlende Anfragen bekommen 403.
-- Zustandsverändernde Endpunkte (`/api/run`, `/api/save`) verlangen
-  zusätzlich einen festen `X-Tester-Csrf`-Header — greift auch im
+- Zustandsverändernde Endpunkte (`/api/run`, `/api/save`, `/api/check`)
+  verlangen zusätzlich einen festen `X-Tester-Csrf`-Header — greift auch im
   Standard-Loopback-Modus, schützt vor Codeausführung durch eine andere im
   selben Browser offene Webseite ("localhost CSRF").
+- `/api/check` (Code Inspector) steht bewusst hinter demselben Schutz wie
+  `/api/run`: Kompilieren bis `CANONICALIZATION` führt AST-Transformationen
+  aus, und die sind beliebiger Code. „Nur prüfen" ist hier nicht
+  gleichbedeutend mit „harmlos".
 - Datei-Laden/-Speichern ist strikt auf das Projektverzeichnis beschränkt
   (kein Verlassen über Pfadangaben).
 - Request-Body-Limit (25 MB) gegen Speicher-Erschöpfung.
@@ -136,6 +225,10 @@ API-Oberfläche — kein SAP-Quellcode.
 ## Projektqualität / Open Source
 
 - Lizenz: GPL-3.0.
+- Einzige mitgelieferte Fremdkomponente im Frontend: CodeMirror 5 (MIT),
+  lokal unter `src/main/resources/ui/assets/codemirror/` samt Lizenztext —
+  bewusst kein CDN, damit die Oberfläche ohne Internetzugang vollständig
+  funktioniert und nichts nach außen telefoniert.
 - Zweisprachige Doku: `README.md` (EN) / `README.de.md` (DE).
 - `SECURITY.md`, `CONTRIBUTING.md`, `examples/README.md`.
 - Klarer Markenrechte-Hinweis: keine Zugehörigkeit zu/Unterstützung durch

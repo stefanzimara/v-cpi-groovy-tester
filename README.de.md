@@ -29,6 +29,8 @@ CPI-spezifischen Aufrufen.
 - [Bauen](#bauen)
 - [Variante 1 — Kommandozeile](#variante-1--kommandozeile)
 - [Variante 2 — Weboberfläche](#variante-2--weboberfläche)
+- [Code Inspector](#code-inspector)
+- [Trace: den Ablauf durchspulen](#trace-den-ablauf-durchspulen)
 - [Zugriff über das Netzwerk](#zugriff-über-das-netzwerk)
 - [Testfall-Konfiguration (`config.json`)](#testfall-konfiguration-configjson)
 - [Ein größeres Beispiel](#ein-größeres-beispiel)
@@ -162,6 +164,11 @@ Links das Script, rechts oben Input/Header/Properties, rechts unten
 Output/Console/Ergebnis-Properties/Attachments. `⌘`/`Strg`+`Enter` führt das
 Script von überall auf der Seite aus.
 
+- **Code-Editor** mit Groovy-Syntaxhervorhebung, Zeilennummern,
+  Klammer-Matching und einem [Code Inspector](#code-inspector), der schon
+  beim Tippen prüft. CodeMirror liegt im JAR statt auf einem CDN — die
+  Oberfläche funktioniert ohne Internetzugang, und nichts telefoniert nach
+  außen.
 - **Größenverstellbare Bereiche** — an den Trennern zwischen den Panels
   ziehen, Doppelklick setzt einen Trenner zurück. Die Aufteilung wird gemerkt.
 - **Pretty-Print** für den Output-Tab (XML und JSON, automatisch erkannt).
@@ -182,7 +189,98 @@ Script von überall auf der Seite aus.
 - Script und Input lassen sich direkt aus dem Projektordner laden und wieder
   dorthin speichern; der Bearbeitungsstand bleibt im Browser erhalten.
 
-### Zugriff über das Netzwerk
+## Code Inspector
+
+Während man tippt, prüft die Oberfläche das Script, **ohne es auszuführen**,
+und meldet Probleme mit Zeile und Spalte — als Punkt im Gutter, gepunktete
+Unterstreichung im Code und Liste unterhalb des Editors. Ein Klick auf einen
+Eintrag springt zur Stelle. Der `◉`-Knopf in der Script-Leiste schaltet ihn
+ab; die Wahl wird gemerkt.
+
+Zwei Quellen speisen ihn:
+
+**Der Groovy-Compiler selbst**, bis Phase `CANONICALIZATION`. Das deckt
+Syntaxfehler, nicht auflösbare Imports und Klassen sowie die
+Compiler-Warnungen ab — also alles, woran auch ein echter Lauf scheitern
+würde. Bytecode wird dabei nicht erzeugt.
+
+**CPI-spezifische Regeln** auf dem AST, also die Stolperfallen, die ein
+normaler Groovy-Compiler nicht kennen kann:
+
+| Regel | Meldet |
+|---|---|
+| `entryMissing` | keine Methode `processData(Message)` — der Runner hat nichts zum Aufrufen |
+| `entryReturnsVoid` | Einstiegsmethode als `void` deklariert, statt die Message zurückzugeben |
+| `entryParamType` | Einstiegsmethode nimmt keine Message entgegen |
+| `apiVersionMix` | beide Message-Generationen gleichzeitig importiert |
+| `bodyReadTwice` | ungetypter Body mehrfach gelesen — in CPI ein `InputStream`, ab dem zweiten Lesen leer |
+| `bodyUntyped` | `getBody()` ohne Typ statt `getBody(java.lang.String)` |
+| `setBodyMissing` | das Script setzt nie einen Body |
+| `messageLogNullCheck` | MessageLog ohne Null-Prüfung benutzt — `getMessageLog(..)` liefert `null`, wenn das Tenant-Logging aus ist |
+| `unknownProperty` / `unknownHeader` | Name wird gelesen, ist im aktuellen Testfall aber nicht gesetzt |
+| `hardcodedSecret` | Passwort/Token als Literal im Code statt aus dem Secure Store |
+| `forbiddenSleep` / `forbiddenExit` / `fileAccess` | `Thread.sleep`, `System.exit`, `java.io.File` — auf dem Tenant unzulässig oder wirkungslos |
+| `emptyCatch` | leerer `catch`-Block, der Fehler verschwindet spurlos |
+| `printlnUsage` | `println` erreicht auf dem Tenant niemanden |
+
+Die Regeln kennen den **aktuellen Testfall**: eine Property, die das Script
+liest, die aber weder unter Properties steht noch vom Script selbst gesetzt
+wird, erscheint als Hinweis — und verschwindet, sobald man sie anlegt.
+
+Die Regeln sind bewusst konservativ ausgelegt: lieber eine Falle nicht melden
+als ständig falschen Alarm schlagen — ein Linter, dem man nicht glaubt, wird
+abgeschaltet.
+
+> Die Prüfung kompiliert bis `CANONICALIZATION`, und dabei laufen
+> AST-Transformationen — also beliebiger Code. `/api/check` steht deshalb
+> hinter demselben Schutz wie `/api/run`; „nur prüfen“ ist hier nicht
+> dasselbe wie „harmlos“.
+
+## Trace: den Ablauf durchspulen
+
+Der Knopf **⏱ Trace** führt das Script aus und schreibt dabei jeden Schritt
+mit. Danach spulst du den Ablauf im Trace-Tab vor und zurück und siehst an
+jeder Stelle, was das Script gerade tut — ohne dafür ein einziges `println`
+oder Debug-Log einzubauen.
+
+Pro ausgeführtem Statement festgehalten:
+
+- die **Zeilennummer**, im Editor hervorgehoben und angesprungen
+- die **dort sichtbaren lokalen Variablen** samt Werten
+- die **Änderungen an der Message** — Property, Header oder Body, jeweils
+  vorher → nachher
+- die **Konsolenausgabe dieses Schritts**
+
+Der Filter **„nur Schritte, die etwas ändern"** überspringt die
+Wiederholungen, die in einer Schleife den Großteil ausmachen. Bricht der Lauf
+ab, endet die Aufzeichnung genau dort, mit den Variablenständen unmittelbar
+davor — und dort steht meist die Antwort.
+
+Gespeichert werden nur Änderungen, nicht der volle Zustand pro Schritt, und
+ein Schrittlimit (Standard 5000) verhindert, dass eine große Schleife eine
+Aufzeichnung um ein Vielfaches der Nutzdaten erzeugt. Wird das Limit
+erreicht, sagt die Anzeige, wie viele Schritte tatsächlich liefen und ab wo
+etwas fehlt.
+
+**Wie es funktioniert.** Ein `CompilationCustomizer` (`TraceTransformer`)
+hängt in der Compiler-Phase `CONVERSION` vor jedes Statement einen Aufruf des
+`TraceRecorder`. Zu diesem Zeitpunkt ist der AST geparst, die Variablen sind
+aber noch nicht aufgelöst — der eingefügte Code durchläuft danach dieselben
+Phasen wie handgeschriebener und braucht keine Sonderbehandlung. Welche
+Variablen an einer Stelle sichtbar sind, führt der Transformer selbst Buch:
+eine erst weiter unten deklarierte Variable darf nicht auftauchen, sonst
+liefe der erzeugte Code in eine `MissingPropertyException`.
+
+Damit ist echte Variableninspektion **ohne zweiten Prozess und ohne
+JDWP/JDI** möglich. Erfasst werden auch Closure-Rümpfe (samt implizitem
+`it`), Schleifenvariablen und Catch-Variablen. Eingefügt wird immer *vor*
+einem Statement, nie danach — sonst wäre das letzte Statement einer Methode
+nicht mehr das letzte und Groovys impliziter Rückgabewert ein anderer.
+
+Ohne ⏱ Trace wird nichts instrumentiert: ein normaler Lauf ist byte-gleich zu
+vorher.
+
+## Zugriff über das Netzwerk
 
 Der Server bindet standardmäßig nur auf `127.0.0.1` und beschränkt
 Datei-Laden/-Speichern auf das Projektverzeichnis. Für den Zugriff von einem
@@ -343,8 +441,9 @@ testdata/                   Eingabedateien und Testfall-Konfigurationen
 examples/                   ein groesseres, realistischeres Beispiel (eigenes README)
 out/                        Ergebnisse (wird bei Bedarf angelegt)
 src/main/java/com/sap/...   Nachbau der CPI-APIs (Clean-Room-Reimplementierung)
-src/main/java/de/cpitester/ Runner, CLI, Webserver
-src/main/resources/ui/      Weboberfläche (eine Datei, keine externen Abhängigkeiten)
+src/main/java/de/cpitester/ Runner, Code Inspector, CLI, Webserver
+src/main/resources/ui/      Weboberfläche (eine geschlossene HTML-Datei)
+  assets/codemirror/        mitgelieferter Editor, MIT-Lizenz (kein CDN, offline nutzbar)
 ```
 
 ## Mitwirken

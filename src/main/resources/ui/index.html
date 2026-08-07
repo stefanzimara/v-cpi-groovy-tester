@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="data:,">
 <title>CPI Groovy Tester</title>
+<!-- CodeMirror liegt lokal im JAR (MIT-Lizenz, siehe assets/codemirror/LICENSE.txt).
+     Bewusst kein CDN: der Tester muss auch ohne Internetzugang vollstaendig laufen. -->
+<link rel="stylesheet" href="/assets/codemirror/codemirror.min.css">
+<link rel="stylesheet" href="/assets/codemirror/lint.min.css">
 <style>
   :root {
     --bg: #f4f5f7;
@@ -177,6 +181,125 @@
     border: 1px solid var(--err); border-radius: 6px; padding: 10px 12px; margin-bottom: 10px;
     background: color-mix(in srgb, var(--err) 10%, transparent);
   }
+
+  /* ---------- Code editor (CodeMirror) ----------
+     CodeMirror brings its own light theme. Instead of shipping a second
+     theme file for dark mode, the token colours are mapped onto the CSS
+     variables above, so the editor follows the rest of the UI. */
+  .cm-wrap { flex: 1; min-height: 0; position: relative; }
+  .cm-wrap .CodeMirror {
+    position: absolute; inset: 0; height: 100%;
+    font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    background: var(--code-bg); color: var(--text);
+  }
+  .CodeMirror-gutters { background: var(--code-bg); border-right: 1px solid var(--border); }
+  .CodeMirror-linenumber { color: var(--muted); }
+  .CodeMirror-cursor { border-left: 1px solid var(--text); }
+  .CodeMirror-activeline-background { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+  .CodeMirror-selected { background: color-mix(in srgb, var(--accent) 22%, transparent) !important; }
+  .CodeMirror-matchingbracket { color: var(--accent) !important; font-weight: 600; text-decoration: underline; }
+  .cm-s-default .cm-keyword  { color: #a626a4; }
+  .cm-s-default .cm-def,
+  .cm-s-default .cm-variable-2 { color: #4078f2; }
+  .cm-s-default .cm-string,
+  .cm-s-default .cm-string-2 { color: #50a14f; }
+  .cm-s-default .cm-comment  { color: var(--muted); font-style: italic; }
+  .cm-s-default .cm-number   { color: #c18401; }
+  .cm-s-default .cm-meta,
+  .cm-s-default .cm-atom     { color: #986801; }
+  .cm-s-default .cm-operator { color: var(--text); }
+  .cm-s-default .cm-property { color: var(--text); }
+  @media (prefers-color-scheme: dark) {
+    .cm-s-default .cm-keyword  { color: #c678dd; }
+    .cm-s-default .cm-def,
+    .cm-s-default .cm-variable-2 { color: #61afef; }
+    .cm-s-default .cm-string,
+    .cm-s-default .cm-string-2 { color: #98c379; }
+    .cm-s-default .cm-number   { color: #d19a66; }
+    .cm-s-default .cm-meta,
+    .cm-s-default .cm-atom     { color: #e5c07b; }
+  }
+
+  /* Lint markers: replace the addon's bitmap icons with coloured dots that
+     work in both colour schemes. */
+  .CodeMirror-lint-marker {
+    background-image: none !important; width: 12px; height: 12px; position: relative;
+  }
+  .CodeMirror-lint-marker::after {
+    content: ''; position: absolute; top: 3px; left: 2px;
+    width: 7px; height: 7px; border-radius: 50%;
+  }
+  .CodeMirror-lint-marker-error::after   { background: var(--err); }
+  .CodeMirror-lint-marker-warning::after { background: #d98324; }
+  .CodeMirror-lint-marker-info::after    { background: var(--accent); }
+  .CodeMirror-lint-marker-multiple { background-image: none !important; }
+  .CodeMirror-lint-mark { background-image: none !important; }
+  .CodeMirror-lint-mark-error   { border-bottom: 2px dotted var(--err); }
+  .CodeMirror-lint-mark-warning { border-bottom: 2px dotted #d98324; }
+  .CodeMirror-lint-mark-info    { border-bottom: 1px dotted var(--accent); }
+  .CodeMirror-lint-tooltip {
+    background: var(--panel); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; font: 12px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    box-shadow: 0 6px 20px rgba(0,0,0,.25); max-width: 460px;
+  }
+
+  /* ---------- Inspector: summary in the bar and the problem list ---------- */
+  #inspectSummary { display: inline-flex; gap: 8px; align-items: center; white-space: nowrap; }
+  #inspectSummary .sev { display: inline-flex; align-items: center; gap: 3px; }
+  #inspectSummary .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+  .dot.error { background: var(--err); }
+  .dot.warning { background: #d98324; }
+  .dot.info { background: var(--accent); }
+  #problems {
+    display: none; border-top: 1px solid var(--border); background: var(--panel);
+    max-height: 34%; overflow: auto; flex: 0 0 auto;
+  }
+  #problems.open { display: block; }
+  #problems .row {
+    display: flex; gap: 8px; align-items: baseline; padding: 4px 10px; cursor: pointer;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+  }
+  #problems .row:hover { background: var(--code-bg); }
+  #problems .row .loc {
+    color: var(--muted); font: 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    flex: 0 0 auto; min-width: 42px; text-align: right;
+  }
+  #problems .row .txt { flex: 1; min-width: 0; }
+  #problems .row .rule { color: var(--muted); font-size: 11px; flex: 0 0 auto; }
+
+  /* ---------- Trace: timeline and step detail ---------- */
+  .cm-trace-line { background: color-mix(in srgb, var(--accent) 20%, transparent) !important; }
+  .trace-bar {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    padding: 5px 8px; border-bottom: 1px solid var(--border); background: var(--code-bg);
+  }
+  .trace-bar input[type=range] { flex: 1; min-width: 100px; accent-color: var(--accent); }
+  #traceLabel { white-space: nowrap; font-variant-numeric: tabular-nums; }
+  #traceDetail { padding: 0; }
+  #traceDetail .empty { padding: 14px 12px; color: var(--muted); }
+  #traceDetail h4 {
+    margin: 0; padding: 6px 10px; font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: .04em; color: var(--muted);
+    background: var(--code-bg); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+  }
+  #traceDetail table { width: 100%; border-collapse: collapse; }
+  #traceDetail td {
+    padding: 3px 10px; vertical-align: top; border-bottom: 1px solid color-mix(in srgb, var(--border) 45%, transparent);
+    font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    word-break: break-word;
+  }
+  #traceDetail td.name { width: 30%; color: var(--muted); white-space: nowrap; }
+  #traceDetail td.arrow { width: 18px; color: var(--muted); text-align: center; }
+  #traceDetail .was { color: var(--muted); text-decoration: line-through; }
+  #traceDetail pre {
+    margin: 0; padding: 6px 10px; white-space: pre-wrap; word-break: break-word;
+    font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  #traceDetail .tag {
+    display: inline-block; margin-right: 6px; padding: 0 5px; border-radius: 4px;
+    background: var(--border); color: var(--text); font-size: 10px; text-transform: uppercase;
+  }
+  .trace-note { padding: 6px 10px; color: var(--muted); font-size: 12px; }
 </style>
 </head>
 <body>
@@ -185,6 +308,7 @@
   <img id="brandLogo" src="/assets/valcoba-logo.png" alt="Valcoba">
   <h1>CPI Groovy Tester</h1>
   <button class="primary" id="btnRun"><span id="btnRunLabel">▶ Run</span> <span style="opacity:.7">(⌘/Ctrl+↵)</span></button>
+  <button id="btnTrace" data-i18n-title="trace.buttonTitle" title="Record the run step by step"><span id="btnTraceLabel">⏱ Trace</span></button>
   <label class="check"><span data-i18n="header.entry">Entry point</span> <input type="text" id="entryMethod" value="processData" size="12"></label>
   <label class="check"><input type="checkbox" id="messageLogEnabled" checked> <span data-i18n="header.messageLog">messageLog active</span></label>
   <span id="runtime" class="muted"></span>
@@ -200,10 +324,15 @@
       <div class="bar">
         <strong data-i18n="panel.script">Script</strong>
         <input type="text" id="scriptPath" class="grow" data-i18n-placeholder="panel.scriptPathPlaceholder" placeholder="scripts/MyScript.groovy">
+        <span id="inspectSummary" class="muted"></span>
+        <button class="icon on" id="btnInspect" data-i18n-title="inspect.toggleTitle" title="Inspector">◉</button>
         <button id="btnScriptLoad" data-i18n="action.load">Load</button>
         <button id="btnScriptSave" data-i18n="action.save">Save</button>
       </div>
-      <div class="body active"><textarea id="script" spellcheck="false"></textarea></div>
+      <div class="body active">
+        <div class="cm-wrap"><textarea id="script" spellcheck="false"></textarea></div>
+        <div id="problems"></div>
+      </div>
     </section>
   </div>
 
@@ -244,6 +373,7 @@
           <div class="tab" data-tab="console" data-i18n="tab.console">Console</div>
           <div class="tab" data-tab="rprops"><span data-i18n="tab.resultProps">Result props</span> <span class="badge" id="cntRProps">0</span></div>
           <div class="tab" data-tab="attach"><span data-i18n="tab.attachments">Attachments</span> <span class="badge" id="cntAttach">0</span></div>
+          <div class="tab" data-tab="trace"><span data-i18n="tab.trace">Trace</span> <span class="badge" id="cntTrace">0</span></div>
         </div>
         <div class="grow"></div>
         <button id="btnCopy" data-i18n="action.copy" data-i18n-title="action.copyTitle" title="Copy the active tab's content to the clipboard">Copy</button>
@@ -255,6 +385,19 @@
       <div class="body" data-body="console"><pre class="out" id="console"></pre></div>
       <div class="body" data-body="rprops"><div class="scroll" id="rprops"></div></div>
       <div class="body" data-body="attach"><div class="scroll" id="attachments"></div></div>
+      <div class="body" data-body="trace">
+        <div class="trace-bar">
+          <button class="icon" id="traceFirst" data-i18n-title="trace.first" title="First step">⏮</button>
+          <button class="icon" id="tracePrev" data-i18n-title="trace.prev" title="Previous step">◀</button>
+          <input type="range" id="traceSlider" min="0" max="0" value="0" data-i18n-title="trace.slider" title="Scrub through the run">
+          <button class="icon" id="traceNext" data-i18n-title="trace.next" title="Next step">▶</button>
+          <button class="icon" id="traceLast" data-i18n-title="trace.last" title="Last step">⏭</button>
+          <span id="traceLabel" class="muted"></span>
+          <label class="check"><input type="checkbox" id="traceOnlyChanges">
+            <span data-i18n="trace.onlyChanges">only steps that change something</span></label>
+        </div>
+        <div class="scroll" id="traceDetail"></div>
+      </div>
     </section>
   </div>
 </main>
@@ -284,6 +427,12 @@
   </div>
 </div>
 
+<script src="/assets/codemirror/codemirror.min.js"></script>
+<script src="/assets/codemirror/groovy.min.js"></script>
+<script src="/assets/codemirror/matchbrackets.min.js"></script>
+<script src="/assets/codemirror/closebrackets.min.js"></script>
+<script src="/assets/codemirror/active-line.min.js"></script>
+<script src="/assets/codemirror/lint.min.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 const STORE = 'cpi-groovy-tester-state';
@@ -341,6 +490,49 @@ const I18N = {
     'tab.attachments': 'Attachments',
     'gutter.title': 'Drag to resize, double-click to reset',
     'hint.properties': 'Common CPI properties (examples): debugLoggingEnabled, processDebugLog. Add whatever your script expects.',
+    'header.trace': 'Trace',
+    'tab.trace': 'Trace',
+    'trace.buttonTitle': 'Run and record every step, so you can scrub through it afterwards',
+    'trace.first': 'First step',
+    'trace.prev': 'Previous step',
+    'trace.next': 'Next step',
+    'trace.last': 'Last step',
+    'trace.slider': 'Scrub through the run',
+    'trace.onlyChanges': 'only steps that change something',
+    'trace.empty': 'Nothing recorded yet. Press ⏱ Trace to run the script and record every step – afterwards you can scrub back and forth and see the variables at each point, without adding a single println.',
+    'trace.label': 'Step {0} / {1} · line {2}',
+    'trace.recording': 'recording …',
+    'trace.variables': 'Variables',
+    'trace.changes': 'Changed in this step',
+    'trace.console': 'Console output in this step',
+    'trace.noVariables': 'no local variables in scope yet',
+    'trace.truncated': 'Recording stopped after {0} steps; the run executed {1}. Everything after that is missing.',
+    'trace.stoppedHere': 'The run stopped here.',
+    'trace.body': 'body',
+    'trace.added': 'set',
+    'trace.removed': 'removed',
+    'inspect.toggleTitle': 'Inspector: check the script for problems while typing',
+    'inspect.clean': 'no problems',
+    'inspect.off': 'inspector off',
+    'inspect.checking': 'checking …',
+    /* One entry per rule id from CodeInspector. Rules without an entry here
+       fall back to the English text the server sent along. */
+    'lint.entryMissing': 'No method “{0}(Message)” found – the runner has nothing to call.',
+    'lint.entryParamType': '“{0}” takes a {1}. CPI always hands in a Message.',
+    'lint.entryReturnsVoid': '“{0}” is declared void – it has to return the Message.',
+    'lint.apiVersionMix': 'Both Message classes (Script Version 1.x and 2.x) are imported – a CPI script uses exactly one generation.',
+    'lint.bodyReadTwice': 'The untyped body is read more than once. In CPI it is an InputStream: from the second read on it is empty. Use getBody(java.lang.String).',
+    'lint.bodyUntyped': 'getBody() without a type is an InputStream in CPI and can only be read once – getBody(java.lang.String) is the safer form.',
+    'lint.setBodyMissing': 'The script never calls setBody – the body is passed through unchanged.',
+    'lint.messageLogNullCheck': '“{0}” can be null: messageLogFactory.getMessageLog(..) returns null when logging is switched off on the tenant.',
+    'lint.unknownProperty': 'Property “{0}” is read but is not set in the current test case.',
+    'lint.unknownHeader': 'Header “{0}” is read but is not set in the current test case.',
+    'lint.hardcodedSecret': '“{0}” holds a hard-coded literal – use the secure store (SecureStoreService) instead.',
+    'lint.forbiddenSleep': 'Thread.sleep blocks a CPI worker thread.',
+    'lint.forbiddenExit': 'System.exit would take down the whole runtime, not just this script.',
+    'lint.fileAccess': 'CPI has no file system – java.io.File will not work on the tenant.',
+    'lint.emptyCatch': 'Empty catch block – the error vanishes without a trace.',
+    'lint.printlnUsage': 'println only reaches the console ({0}×). Nobody sees it on the tenant – log via messageLogFactory or a property.',
     'status.running': 'running …',
     'status.noPath': 'No path given.',
     'status.loaded': 'Loaded: {0}',
@@ -377,6 +569,22 @@ const I18N = {
       </ol>
       <p>Everything is remembered in the browser between runs. The layout panels can be resized by
       dragging the dividers between them; double-click a divider to reset it.</p>
+      <h3>The inspector</h3>
+      <p>While you type, the script is checked <b>without being run</b>. Problems appear as a dot in the
+      gutter, a dotted underline in the code and a list under the editor – click an entry to jump there.
+      Two things feed it: the Groovy compiler (syntax errors, unresolvable imports, compiler warnings)
+      and CPI-specific rules – a body read twice, a MessageLog used without a null check, a property
+      your script reads that nobody set in this test case, a hard-coded password, and so on.</p>
+      <p>The rules also know your current test case, so adding the missing property makes that hint
+      disappear. The <code>◉</code> button next to the path field turns the inspector off.</p>
+      <h3>Stepping through a run</h3>
+      <p><b>⏱ Trace</b> runs the script and records every step. In the <b>Trace</b> tab on the right you
+      then scrub back and forth: for each step you see the line (highlighted in the editor), the local
+      variables with their values, what changed on the message, and the console output of that step –
+      no <code>println</code> needed to find out.</p>
+      <p>The <b>only steps that change something</b> filter skips the repetitions a loop produces.
+      If the run fails, the recording ends exactly where it stopped, with the variable values from
+      just before. A plain <b>Run</b> records nothing and is unaffected.</p>
       <h3>Command line</h3>
       <p>Everything the UI does is also available as a CLI, useful for scripting or CI:</p>
       <pre>./run.sh run --script scripts/MyScript.groovy \\
@@ -452,6 +660,8 @@ const I18N = {
       <p><b>CPI Groovy Tester</b> – a local test harness for SAP Cloud Integration Groovy scripts.</p>
       <p>Originally built for internal use at <a href="https://www.valcoba.com" target="_blank" rel="noopener">Valcoba</a>,
       your CSV and Quality partner, and shared as open source.</p>
+      <p>The editor is <a href="https://codemirror.net/5/" target="_blank" rel="noopener">CodeMirror 5</a>
+      (MIT), bundled inside the JAR rather than loaded from a CDN so this page works offline.</p>
       <p>Licensed under GPL-3.0. Not affiliated with or endorsed by SAP. "SAP", "SAP Cloud Integration"
       and related marks are trademarks of SAP SE. The bundled runtime classes are a clean-room
       reimplementation of the publicly documented Script API surface, written for local testing only
@@ -484,6 +694,47 @@ const I18N = {
     'tab.attachments': 'Attachments',
     'gutter.title': 'Ziehen zum Verschieben, Doppelklick setzt zurück',
     'hint.properties': 'Häufige CPI-Properties (Beispiele): debugLoggingEnabled, processDebugLog. Ergänze, was dein Script erwartet.',
+    'header.trace': 'Trace',
+    'tab.trace': 'Trace',
+    'trace.buttonTitle': 'Ausführen und dabei jeden Schritt mitschreiben, um ihn danach durchzuspulen',
+    'trace.first': 'Erster Schritt',
+    'trace.prev': 'Vorheriger Schritt',
+    'trace.next': 'Nächster Schritt',
+    'trace.last': 'Letzter Schritt',
+    'trace.slider': 'Durch den Ablauf spulen',
+    'trace.onlyChanges': 'nur Schritte, die etwas ändern',
+    'trace.empty': 'Noch nichts aufgezeichnet. ⏱ Trace führt das Script aus und schreibt jeden Schritt mit – danach lässt sich der Ablauf vor- und zurückspulen, samt Variablenwerten an jeder Stelle, ohne ein einziges println.',
+    'trace.label': 'Schritt {0} / {1} · Zeile {2}',
+    'trace.recording': 'zeichne auf …',
+    'trace.variables': 'Variablen',
+    'trace.changes': 'In diesem Schritt geändert',
+    'trace.console': 'Konsolenausgabe in diesem Schritt',
+    'trace.noVariables': 'noch keine lokalen Variablen im Gültigkeitsbereich',
+    'trace.truncated': 'Aufzeichnung nach {0} Schritten gestoppt, ausgeführt wurden {1}. Alles danach fehlt.',
+    'trace.stoppedHere': 'Hier ist der Lauf stehengeblieben.',
+    'trace.body': 'Body',
+    'trace.added': 'gesetzt',
+    'trace.removed': 'entfernt',
+    'inspect.toggleTitle': 'Inspector: prüft das Script schon beim Tippen auf Probleme',
+    'inspect.clean': 'keine Probleme',
+    'inspect.off': 'Inspector aus',
+    'inspect.checking': 'prüfe …',
+    'lint.entryMissing': 'Keine Methode „{0}(Message)“ gefunden – der Runner hat nichts zum Aufrufen.',
+    'lint.entryParamType': '„{0}“ nimmt ein {1} entgegen. CPI übergibt immer eine Message.',
+    'lint.entryReturnsVoid': '„{0}“ ist als void deklariert – die Methode muss die Message zurückgeben.',
+    'lint.apiVersionMix': 'Beide Message-Klassen (Script Version 1.x und 2.x) sind importiert – ein CPI-Script nutzt genau eine Generation.',
+    'lint.bodyReadTwice': 'Der ungetypte Body wird mehrfach gelesen. In CPI ist er ein InputStream: ab dem zweiten Lesen ist er leer. Besser getBody(java.lang.String).',
+    'lint.bodyUntyped': 'getBody() ohne Typ ist in CPI ein InputStream und nur einmal lesbar – getBody(java.lang.String) ist die sichere Form.',
+    'lint.setBodyMissing': 'Das Script ruft nie setBody auf – der Body geht unverändert durch.',
+    'lint.messageLogNullCheck': '„{0}“ kann null sein: messageLogFactory.getMessageLog(..) liefert null, wenn das Logging auf dem Tenant aus ist.',
+    'lint.unknownProperty': 'Property „{0}“ wird gelesen, ist im aktuellen Testfall aber nicht gesetzt.',
+    'lint.unknownHeader': 'Header „{0}“ wird gelesen, ist im aktuellen Testfall aber nicht gesetzt.',
+    'lint.hardcodedSecret': '„{0}“ enthält ein fest verdrahtetes Literal – besser über den Secure Store (SecureStoreService).',
+    'lint.forbiddenSleep': 'Thread.sleep blockiert einen CPI-Worker-Thread.',
+    'lint.forbiddenExit': 'System.exit würde die gesamte Laufzeitumgebung beenden, nicht nur dieses Script.',
+    'lint.fileAccess': 'CPI hat kein Dateisystem – java.io.File funktioniert auf dem Tenant nicht.',
+    'lint.emptyCatch': 'Leerer catch-Block – der Fehler verschwindet spurlos.',
+    'lint.printlnUsage': 'println landet nur auf der Konsole ({0}×). Auf dem Tenant sieht das niemand – besser über messageLogFactory oder eine Property loggen.',
     'status.running': 'läuft …',
     'status.noPath': 'Kein Pfad angegeben.',
     'status.loaded': 'Geladen: {0}',
@@ -520,6 +771,23 @@ const I18N = {
       </ol>
       <p>Alles wird im Browser zwischen den Läufen gemerkt. Die Bereiche lassen sich durch Ziehen
       an den Trennern zwischen ihnen vergrößern/verkleinern; Doppelklick auf einen Trenner setzt ihn zurück.</p>
+      <h3>Der Inspector</h3>
+      <p>Während du tippst, wird das Script geprüft, <b>ohne es auszuführen</b>. Probleme erscheinen als
+      Punkt im Gutter, gepunktete Unterstreichung im Code und Liste unter dem Editor – ein Klick auf einen
+      Eintrag springt zur Stelle. Zwei Quellen speisen ihn: der Groovy-Compiler (Syntaxfehler, nicht
+      auflösbare Imports, Compiler-Warnungen) und CPI-spezifische Regeln – zweimal gelesener Body,
+      MessageLog ohne Null-Prüfung, eine Property, die das Script liest, die im Testfall aber niemand
+      gesetzt hat, ein fest verdrahtetes Passwort und so weiter.</p>
+      <p>Die Regeln kennen deinen aktuellen Testfall: legst du die fehlende Property an, verschwindet der
+      Hinweis. Der <code>◉</code>-Knopf neben dem Pfadfeld schaltet den Inspector ab.</p>
+      <h3>Den Ablauf durchspulen</h3>
+      <p><b>⏱ Trace</b> führt das Script aus und schreibt jeden Schritt mit. Im Tab <b>Trace</b> rechts
+      spulst du danach vor und zurück: pro Schritt siehst du die Zeile (im Editor hervorgehoben), die
+      lokalen Variablen samt Werten, was sich an der Message geändert hat und die Konsolenausgabe dieses
+      Schritts – ganz ohne <code>println</code>.</p>
+      <p>Der Filter <b>nur Schritte, die etwas ändern</b> überspringt die Wiederholungen aus Schleifen.
+      Bricht der Lauf ab, endet die Aufzeichnung genau dort, mit den Variablenständen unmittelbar davor.
+      Ein normales <b>Ausführen</b> zeichnet nichts auf und bleibt unverändert.</p>
       <h3>Kommandozeile</h3>
       <p>Alles, was die UI macht, geht auch als CLI – nützlich zum Skripten oder in CI:</p>
       <pre>./run.sh run --script scripts/MeinScript.groovy \\
@@ -596,6 +864,8 @@ const I18N = {
       <p><b>CPI Groovy Tester</b> – eine lokale Testumgebung für SAP-Cloud-Integration-Groovy-Scripts.</p>
       <p>Ursprünglich für den internen Einsatz bei <a href="https://www.valcoba.com" target="_blank" rel="noopener">Valcoba</a>,
       Your CSV and Quality Partner, entstanden und als Open Source veröffentlicht.</p>
+      <p>Der Editor ist <a href="https://codemirror.net/5/" target="_blank" rel="noopener">CodeMirror 5</a>
+      (MIT), im JAR mitgeliefert statt von einem CDN geladen – damit diese Seite offline funktioniert.</p>
       <p>Lizenziert unter GPL-3.0. Keine Zugehörigkeit zu oder Unterstützung durch SAP. "SAP", "SAP
       Cloud Integration" und verwandte Bezeichnungen sind Marken der SAP SE. Die mitgelieferten
       Laufzeitklassen sind ein Clean-Room-Nachbau der öffentlich dokumentierten Script-API-Oberfläche,
@@ -619,6 +889,11 @@ function applyI18n() {
   document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.placeholder = t(el.dataset.i18nPlaceholder); });
   document.querySelectorAll('[data-i18n-html]').forEach(el => { el.innerHTML = t(el.dataset.i18nHtml); });
   $('btnRunLabel').textContent = '▶ ' + t('header.run');
+  $('btnTraceLabel').textContent = '⏱ ' + t('header.trace');
+  /* Findings carry a rule id, not finished text - so a language switch
+     re-labels the existing ones without asking the server again. */
+  renderProblems();
+  if (traceSteps.length) setTraceStep(traceIndex); else renderTrace(null);
 }
 
 function setLanguage(code) {
@@ -715,12 +990,15 @@ function kvToObject(which) {
 function updateCounts() {
   $('cntHeaders').textContent = Object.keys(kvToObject('headers')).length;
   $('cntProps').textContent = Object.keys(kvToObject('props')).length;
+  /* A header/property that just appeared or vanished changes what the
+     inspector considers "set in the test case". */
+  relint();
 }
 
 /* ---------- Remembering state ---------- */
 function save() {
   localStorage.setItem(STORE, JSON.stringify({
-    script: $('script').value, scriptPath: $('scriptPath').value,
+    script: getScript(), scriptPath: $('scriptPath').value,
     body: $('bodyIn').value, bodyPath: $('bodyPath').value, outPath: $('outPath').value,
     entryMethod: $('entryMethod').value, messageLogEnabled: $('messageLogEnabled').checked,
     headers: kv.headers, props: kv.props, prettyOn: prettyOn
@@ -730,7 +1008,7 @@ function save() {
 function restore() {
   let state = {};
   try { state = JSON.parse(localStorage.getItem(STORE) || '{}'); } catch (e) { state = {}; }
-  $('script').value = state.script || '';
+  setScript(state.script || '');
   $('scriptPath').value = state.scriptPath || 'scripts/OrderToXml.groovy';
   $('bodyIn').value = state.body || '';
   $('bodyPath').value = state.bodyPath || 'testdata/order.json';
@@ -749,12 +1027,17 @@ function restore() {
   renderKv('headers'); renderKv('props'); updateCounts();
 }
 
-['script', 'scriptPath', 'bodyIn', 'bodyPath', 'outPath', 'entryMethod'].forEach(id =>
+['scriptPath', 'bodyIn', 'bodyPath', 'outPath', 'entryMethod'].forEach(id =>
   $(id).addEventListener('input', save));
 $('messageLogEnabled').addEventListener('change', save);
 
-/* Tab key in the editors indents instead of leaving the field */
-['script', 'bodyIn'].forEach(id => $(id).addEventListener('keydown', ev => {
+/* The inspector judges the script against the current test case, so a changed
+   entry point or a new header/property changes the verdict too. */
+$('entryMethod').addEventListener('input', () => relint());
+
+/* Tab key in the Input editor indents instead of leaving the field
+   (the script editor is CodeMirror and brings its own handling) */
+['bodyIn'].forEach(id => $(id).addEventListener('keydown', ev => {
   if (ev.key !== 'Tab') return;
   ev.preventDefault();
   const area = ev.target, start = area.selectionStart, end = area.selectionEnd;
@@ -763,13 +1046,190 @@ $('messageLogEnabled').addEventListener('change', save);
   save();
 }));
 
+/* ================================================================
+   Script editor + inspector
+
+   The editor is CodeMirror; the script text therefore no longer lives
+   in the textarea - always go through getScript()/setScript().
+
+   The inspector posts the script to /api/check on every pause in typing
+   and turns the findings into gutter markers, underlines and the list
+   below the editor. The check compiles without running, so it also sees
+   what the current test case provides: a property the script reads but
+   nobody set shows up as a hint.
+   ================================================================ */
+const INSPECT_STORE = 'cpi-groovy-tester-inspect';
+
+let scriptEditor = null;
+let inspectorOn = localStorage.getItem(INSPECT_STORE) !== 'off';
+/* null = not checked yet, [] = checked and clean. The distinction matters:
+   "no problems" must not be claimed before anything was actually checked. */
+let lastFindings = null;
+
+function getScript() {
+  return scriptEditor ? scriptEditor.getValue() : $('script').value;
+}
+
+function setScript(content) {
+  if (scriptEditor) scriptEditor.setValue(content); else $('script').value = content;
+}
+
+function initEditor() {
+  scriptEditor = CodeMirror.fromTextArea($('script'), {
+    mode: 'text/x-groovy',
+    lineNumbers: true,
+    indentUnit: 4, tabSize: 4, indentWithTabs: false,
+    matchBrackets: true, autoCloseBrackets: true, styleActiveLine: true,
+    gutters: ['CodeMirror-lint-markers', 'CodeMirror-linenumbers'],
+    lint: { async: true, delay: 500, getAnnotations: lintScript },
+    extraKeys: {
+      Tab: cm => cm.somethingSelected() ? cm.execCommand('indentMore') : cm.execCommand('insertSoftTab'),
+      'Shift-Tab': cm => cm.execCommand('indentLess'),
+      'Cmd-Enter': () => run(),
+      'Ctrl-Enter': () => run()
+    }
+  });
+  scriptEditor.on('change', save);
+}
+
+async function lintScript(content, updateLinting) {
+  if (!inspectorOn) {
+    lastFindings = null;
+    renderProblems();
+    updateLinting([]);
+    return;
+  }
+  setInspectSummary(t('inspect.checking'));
+  let findings = [];
+  try {
+    const response = await apiPost('/api/check', {
+      script: content,
+      scriptName: ($('scriptPath').value.trim().split('/').pop()) || 'Script.groovy',
+      entryMethod: $('entryMethod').value.trim() || 'processData',
+      headers: kvToObject('headers'),
+      properties: kvToObject('props')
+    }).then(r => r.json());
+    findings = response.findings || [];
+  } catch (e) {
+    /* Server unreachable: no markers rather than wrong ones. Run says it loudly enough. */
+    lastFindings = null;
+    renderProblems();
+    updateLinting([]);
+    return;
+  }
+  lastFindings = findings.slice().sort((a, b) => a.line - b.line || a.column - b.column);
+  renderProblems();
+  updateLinting(lastFindings.map(toAnnotation));
+}
+
+/* Server positions are 1-based, CodeMirror counts from 0. Findings spanning
+   several lines (a whole method, say) are clipped to their first line -
+   underlining a 30-line block helps nobody. */
+function toAnnotation(finding) {
+  const from = CodeMirror.Pos(finding.line - 1, Math.max(0, finding.column - 1));
+  let to = CodeMirror.Pos(finding.endLine - 1, Math.max(0, finding.endColumn - 1));
+  if (to.line !== from.line || to.ch <= from.ch) {
+    to = CodeMirror.Pos(from.line, from.ch + 200);   // CodeMirror clips to the line end
+  }
+  return { message: findingText(finding), severity: finding.severity, from, to };
+}
+
+/* Rules have a stable id and get translated here. Compiler messages come
+   straight from Groovy and are shown as they are. */
+function findingText(finding) {
+  const key = 'lint.' + finding.rule;
+  const dict = I18N[LANG] || I18N.en;
+  if (dict[key] || I18N.en[key]) return t(key, ...(finding.params || []));
+  return finding.message;
+}
+
+function setInspectSummary(value) {
+  const box = $('inspectSummary');
+  box.innerHTML = '';
+  if (typeof value === 'string') {
+    box.textContent = value;
+    return;
+  }
+  ['error', 'warning', 'info'].forEach(severity => {
+    if (!value[severity]) return;
+    const wrap = document.createElement('span');
+    wrap.className = 'sev';
+    const dot = document.createElement('span');
+    dot.className = 'dot ' + severity;
+    wrap.append(dot, document.createTextNode(String(value[severity])));
+    box.appendChild(wrap);
+  });
+}
+
+function renderProblems() {
+  const box = $('problems');
+  box.innerHTML = '';
+  if (!inspectorOn) {
+    box.classList.remove('open');
+    return setInspectSummary(t('inspect.off'));
+  }
+  if (lastFindings === null) {
+    box.classList.remove('open');
+    return setInspectSummary('');
+  }
+  if (!lastFindings.length) {
+    box.classList.remove('open');
+    return setInspectSummary(t('inspect.clean'));
+  }
+
+  const counts = { error: 0, warning: 0, info: 0 };
+  lastFindings.forEach(finding => { counts[finding.severity] = (counts[finding.severity] || 0) + 1; });
+  setInspectSummary(counts);
+
+  lastFindings.forEach(finding => {
+    const row = document.createElement('div');
+    row.className = 'row';
+    const dot = document.createElement('span');
+    dot.className = 'dot ' + finding.severity;
+    const loc = document.createElement('span');
+    loc.className = 'loc';
+    loc.textContent = finding.line + ':' + finding.column;
+    const text = document.createElement('span');
+    text.className = 'txt';
+    text.textContent = findingText(finding);
+    const rule = document.createElement('span');
+    rule.className = 'rule';
+    rule.textContent = finding.rule;
+    row.append(dot, loc, text, rule);
+    row.onclick = () => {
+      if (!scriptEditor) return;
+      scriptEditor.focus();
+      scriptEditor.setCursor({ line: finding.line - 1, ch: Math.max(0, finding.column - 1) });
+      scriptEditor.scrollIntoView(null, 80);
+    };
+    box.appendChild(row);
+  });
+  box.classList.add('open');
+}
+
+/* Re-check after something other than the script itself changed - entry
+   point, headers, properties. Debounced, because those are typed too. */
+let relintTimer = null;
+function relint() {
+  if (!scriptEditor || !scriptEditor.performLint) return;
+  clearTimeout(relintTimer);
+  relintTimer = setTimeout(() => scriptEditor.performLint(), 350);
+}
+
+$('btnInspect').onclick = () => {
+  inspectorOn = !inspectorOn;
+  localStorage.setItem(INSPECT_STORE, inspectorOn ? 'on' : 'off');
+  $('btnInspect').classList.toggle('on', inspectorOn);
+  if (scriptEditor && scriptEditor.performLint) scriptEditor.performLint();
+};
+
 /* ---------- File access ---------- */
-async function loadFile(pathInput, targetInput) {
+async function loadFile(pathInput, applyContent) {
   const path = $(pathInput).value.trim();
   if (!path) return setStatus(t('status.noPath'), 'err');
   const response = await apiGet('/api/load?path=' + encodeURIComponent(path)).then(r => r.json());
   if (!response.ok) return setStatus(response.error, 'err');
-  $(targetInput).value = response.content;
+  applyContent(response.content);
   save();
   setStatus(t('status.loaded', response.path), 'ok');
 }
@@ -780,9 +1240,9 @@ async function saveFile(path, content) {
   setStatus(response.ok ? t('status.saved', response.path) : response.error, response.ok ? 'ok' : 'err');
 }
 
-$('btnScriptLoad').onclick = () => loadFile('scriptPath', 'script');
-$('btnScriptSave').onclick = () => saveFile($('scriptPath').value.trim(), $('script').value);
-$('btnBodyLoad').onclick = () => loadFile('bodyPath', 'bodyIn');
+$('btnScriptLoad').onclick = () => loadFile('scriptPath', setScript);
+$('btnScriptSave').onclick = () => saveFile($('scriptPath').value.trim(), getScript());
+$('btnBodyLoad').onclick = () => loadFile('bodyPath', content => { $('bodyIn').value = content; });
 $('btnBodySave').onclick = () => saveFile($('bodyPath').value.trim(), $('bodyIn').value);
 /* deliberately rawOutput, not the display: Save always writes the unchanged body */
 $('btnOutSave').onclick = () => saveFile($('outPath').value.trim(), rawOutput);
@@ -924,26 +1384,30 @@ function setStatus(text, kind) {
   status.className = kind || '';
 }
 
-async function run() {
-  setStatus(t('status.running'), 'busy');
+async function run(withTrace) {
+  setStatus(withTrace ? t('trace.recording') : t('status.running'), 'busy');
   $('btnRun').disabled = true;
+  $('btnTrace').disabled = true;
   const payload = {
-    script: $('script').value,
+    script: getScript(),
     scriptName: ($('scriptPath').value.trim().split('/').pop()) || 'Script.groovy',
     body: $('bodyIn').value,
     entryMethod: $('entryMethod').value.trim() || 'processData',
     messageLogEnabled: $('messageLogEnabled').checked,
     headers: kvToObject('headers'),
-    properties: kvToObject('props')
+    properties: kvToObject('props'),
+    trace: withTrace === true
   };
   let result;
   try {
     result = await apiPost('/api/run', payload).then(r => r.json());
   } catch (e) {
     $('btnRun').disabled = false;
+    $('btnTrace').disabled = false;
     return setStatus(t('status.serverUnreachable', e), 'err');
   }
   $('btnRun').disabled = false;
+  $('btnTrace').disabled = false;
 
   lastResult = result;
   /* Which Groovy runtime and script-API generation is currently in effect.
@@ -1000,6 +1464,11 @@ async function run() {
     details.append(summary, pre);
     attachments.appendChild(details);
   });
+
+  renderTrace(result);
+  /* A recorded run is meant to be looked at - so show it right away.
+     Errors still win: those belong in the console tab. */
+  if (payload.trace && result.success && traceSteps.length) activate('out', 'trace');
 }
 
 function activate(group, tab) {
@@ -1008,10 +1477,182 @@ function activate(group, tab) {
   if (target) target.click();
 }
 
-$('btnRun').onclick = run;
+/* Bound through arrows on purpose: onclick would hand the MouseEvent to run(),
+   and every plain Run would silently record a trace. */
+$('btnRun').onclick = () => run(false);
+$('btnTrace').onclick = () => run(true);
 document.addEventListener('keydown', ev => {
-  if ((ev.metaKey || ev.ctrlKey) && ev.key === 'Enter') { ev.preventDefault(); run(); }
+  if ((ev.metaKey || ev.ctrlKey) && ev.key === 'Enter') { ev.preventDefault(); run(false); }
 });
+
+/* ================================================================
+   Trace: step through a recorded run
+
+   The recording holds only what changed per step, not the full state -
+   so the variables shown are those visible at that point, and the
+   "changed" section is the delta against the step before.
+   ================================================================ */
+let traceSteps = [];
+let traceIndex = 0;
+let traceExecuted = 0;
+let traceTruncated = false;
+/* CodeMirror line handle of the highlighted line, so it can be removed
+   again even after the line number shifted. */
+let traceLineHandle = null;
+
+function renderTrace(result) {
+  traceSteps = (result && result.trace) || [];
+  traceExecuted = (result && result.traceExecuted) || 0;
+  traceTruncated = (result && result.traceTruncated) === true;
+  traceIndex = 0;
+
+  $('cntTrace').textContent = traceSteps.length;
+  $('traceSlider').max = Math.max(0, traceSteps.length - 1);
+  $('traceSlider').disabled = traceSteps.length === 0;
+  clearTraceLine();
+
+  if (!traceSteps.length) {
+    $('traceLabel').textContent = '';
+    $('traceDetail').innerHTML = '';
+    const empty = document.createElement('div');
+    empty.className = 'empty';
+    empty.textContent = t('trace.empty');
+    $('traceDetail').appendChild(empty);
+    return;
+  }
+  /* Land on the last step: after a failure that is where it stopped,
+     after a successful run it is the finished state. */
+  setTraceStep(traceSteps.length - 1);
+}
+
+function setTraceStep(index) {
+  if (!traceSteps.length) return;
+  traceIndex = Math.max(0, Math.min(traceSteps.length - 1, index));
+  const step = traceSteps[traceIndex];
+  $('traceSlider').value = traceIndex;
+  $('traceLabel').textContent = t('trace.label', traceIndex + 1, traceSteps.length, step.line);
+  highlightTraceLine(step.line);
+  renderTraceDetail(step);
+}
+
+function clearTraceLine() {
+  if (traceLineHandle && scriptEditor) {
+    scriptEditor.removeLineClass(traceLineHandle, 'background', 'cm-trace-line');
+  }
+  traceLineHandle = null;
+}
+
+function highlightTraceLine(line) {
+  clearTraceLine();
+  if (!scriptEditor || line < 1 || line > scriptEditor.lineCount()) return;
+  traceLineHandle = scriptEditor.addLineClass(line - 1, 'background', 'cm-trace-line');
+  scriptEditor.scrollIntoView({ line: line - 1, ch: 0 }, 80);
+}
+
+function traceStepHasContent(step) {
+  return (step.changes && step.changes.length > 0) || (step.console && step.console.length > 0);
+}
+
+/* Skips steps that changed nothing when the filter is on - in a loop those
+   are the majority, and scrolling past them by hand is the tedious part. */
+function moveTraceStep(direction) {
+  if (!traceSteps.length) return;
+  const onlyChanges = $('traceOnlyChanges').checked;
+  let index = traceIndex + direction;
+  while (onlyChanges && index > 0 && index < traceSteps.length - 1
+         && !traceStepHasContent(traceSteps[index])) {
+    index += direction;
+  }
+  setTraceStep(index);
+}
+
+function traceSection(title) {
+  const heading = document.createElement('h4');
+  heading.textContent = title;
+  return heading;
+}
+
+function renderTraceDetail(step) {
+  const box = $('traceDetail');
+  box.innerHTML = '';
+  const isLast = traceIndex === traceSteps.length - 1;
+
+  if (isLast && traceTruncated) {
+    const note = document.createElement('div');
+    note.className = 'trace-note';
+    note.textContent = t('trace.truncated', traceSteps.length, traceExecuted);
+    box.appendChild(note);
+  }
+  if (isLast && lastResult && !lastResult.success) {
+    const note = document.createElement('div');
+    note.className = 'trace-note';
+    note.textContent = t('trace.stoppedHere') + ' ' + (lastResult.error || '');
+    box.appendChild(note);
+  }
+
+  /* Changes first - that is usually what you came for. */
+  if (step.changes && step.changes.length) {
+    box.appendChild(traceSection(t('trace.changes')));
+    const table = document.createElement('table');
+    step.changes.forEach(change => {
+      const row = document.createElement('tr');
+      const name = document.createElement('td');
+      name.className = 'name';
+      const tag = document.createElement('span');
+      tag.className = 'tag';
+      tag.textContent = change.kind === 'body' ? t('trace.body') : change.kind;
+      name.appendChild(tag);
+      if (change.kind !== 'body') name.appendChild(document.createTextNode(change.name));
+      const value = document.createElement('td');
+      if (change.before !== null && change.before !== undefined) {
+        const before = document.createElement('span');
+        before.className = 'was';
+        before.textContent = change.before;
+        value.append(before, document.createTextNode('  →  '));
+      }
+      value.appendChild(document.createTextNode(
+        change.after === null || change.after === undefined ? t('trace.removed') : change.after));
+      row.append(name, value);
+      table.appendChild(row);
+    });
+    box.appendChild(table);
+  }
+
+  if (step.console) {
+    box.appendChild(traceSection(t('trace.console')));
+    const pre = document.createElement('pre');
+    pre.textContent = step.console;
+    box.appendChild(pre);
+  }
+
+  box.appendChild(traceSection(t('trace.variables')));
+  const entries = Object.entries(step.variables || {});
+  if (!entries.length) {
+    const note = document.createElement('div');
+    note.className = 'trace-note';
+    note.textContent = t('trace.noVariables');
+    box.appendChild(note);
+  } else {
+    const table = document.createElement('table');
+    entries.forEach(([name, value]) => {
+      const row = document.createElement('tr');
+      const nameCell = document.createElement('td');
+      nameCell.className = 'name';
+      nameCell.textContent = name;
+      const valueCell = document.createElement('td');
+      valueCell.textContent = value;
+      row.append(nameCell, valueCell);
+      table.appendChild(row);
+    });
+    box.appendChild(table);
+  }
+}
+
+$('traceFirst').onclick = () => setTraceStep(0);
+$('traceLast').onclick = () => setTraceStep(traceSteps.length - 1);
+$('tracePrev').onclick = () => moveTraceStep(-1);
+$('traceNext').onclick = () => moveTraceStep(1);
+$('traceSlider').addEventListener('input', () => setTraceStep(Number($('traceSlider').value)));
 
 /* ---------- Draggable splitters ---------- */
 const LAYOUT_STORE = 'cpi-groovy-tester-layout';
@@ -1097,10 +1738,12 @@ makeDraggable($('gutterRight'), e => {
 window.addEventListener('resize', applyLayout);
 
 /* ---------- Start ---------- */
+initEditor();
+$('btnInspect').classList.toggle('on', inspectorOn);
 initLanguagePicker();
 applyLayout();
 restore();
-if (!$('script').value) $('btnScriptLoad').click();
+if (!getScript()) $('btnScriptLoad').click(); else relint();
 if (!$('bodyIn').value) setTimeout(() => $('btnBodyLoad').click(), 150);
 </script>
 </body>

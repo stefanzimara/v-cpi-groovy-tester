@@ -27,6 +27,8 @@ throwaway class, no stubbing out CPI-specific calls by hand.
 - [Build](#build)
 - [Option 1 — command line](#option-1--command-line)
 - [Option 2 — web UI](#option-2--web-ui)
+- [Code inspector](#code-inspector)
+- [Trace: stepping through a run](#trace-stepping-through-a-run)
 - [Network access](#network-access)
 - [Test case configuration (`config.json`)](#test-case-configuration-configjson)
 - [A larger example](#a-larger-example)
@@ -161,6 +163,10 @@ Script on the left; Input/Headers/Properties top right; Output/Console/Result
 props/Attachments bottom right. `⌘`/`Ctrl`+`Enter` runs the script from
 anywhere on the page.
 
+- **Code editor** with Groovy syntax highlighting, line numbers, bracket
+  matching and a live [code inspector](#code-inspector). CodeMirror is
+  bundled inside the JAR rather than pulled from a CDN, so the UI works with
+  no internet connection and nothing phones home.
 - **Resizable panels** — drag the dividers between panels; double-click a
   divider to reset it. The layout is remembered.
 - **Pretty-print** for the Output tab (XML and JSON, auto-detected). Display
@@ -181,7 +187,93 @@ anywhere on the page.
   directly from the UI; the editing state persists in the browser between
   runs.
 
-### Network access
+## Code inspector
+
+While you type, the UI checks the script **without running it** and reports
+problems with line and column — as a dot in the gutter, a dotted underline in
+the code, and a list below the editor. Clicking an entry jumps to the spot.
+The `◉` button in the script bar turns it off; the choice is remembered.
+
+Two sources feed it:
+
+**The Groovy compiler itself**, up to the `CANONICALIZATION` phase. That
+covers syntax errors, unresolvable imports and classes, and the compiler
+warnings — everything a real run would trip over as well. No bytecode is
+produced.
+
+**CPI-specific rules** on the AST, i.e. the traps a plain Groovy compiler
+cannot know about:
+
+| Rule | Reports |
+|---|---|
+| `entryMissing` | no `processData(Message)` method — the runner has nothing to call |
+| `entryReturnsVoid` | entry method declared `void` instead of returning the Message |
+| `entryParamType` | entry method does not take a Message |
+| `apiVersionMix` | both Message generations imported at once |
+| `bodyReadTwice` | untyped body read more than once — in CPI it is an `InputStream` and is empty from the second read on |
+| `bodyUntyped` | `getBody()` without a type instead of `getBody(java.lang.String)` |
+| `setBodyMissing` | the script never sets a body |
+| `messageLogNullCheck` | MessageLog used without a null check — `getMessageLog(..)` returns `null` when tenant logging is off |
+| `unknownProperty` / `unknownHeader` | name is read but not set in the current test case |
+| `hardcodedSecret` | password/token as a literal in the code instead of the secure store |
+| `forbiddenSleep` / `forbiddenExit` / `fileAccess` | `Thread.sleep`, `System.exit`, `java.io.File` — not allowed or pointless on the tenant |
+| `emptyCatch` | empty `catch` block, the error vanishes without a trace |
+| `printlnUsage` | `println` reaches nobody on the tenant |
+
+The rules know about the **current test case**: a property the script reads
+that is neither listed under Properties nor set by the script itself is
+flagged as a hint — and disappears the moment you add it.
+
+The rules are deliberately conservative: better to miss a trap than to cry
+wolf constantly, because a linter nobody believes gets switched off.
+
+> The check compiles up to `CANONICALIZATION`, which runs AST transformations
+> — arbitrary code. `/api/check` therefore sits behind the same protection as
+> `/api/run`; "only checking" is not the same as "harmless" here.
+
+## Trace: stepping through a run
+
+The **⏱ Trace** button runs the script and records every step along the way.
+Afterwards you scrub back and forth through the run in the Trace tab and see
+what the script was doing at each point — without adding a single `println`
+or debug log to find out.
+
+Recorded per executed statement:
+
+- the **line number**, highlighted and scrolled to in the editor
+- the **local variables visible at that point**, with their values
+- the **changes to the message** — property, header or body, each as before → after
+- the **console output produced by that step**
+
+A **"only steps that change something"** filter skips the repetitions, which
+in a loop are the bulk of it. When the run blows up, the recording ends
+exactly where it stopped, with the variable values from just before — which
+is usually where the answer is.
+
+Only changes are stored, not the full state per step, and a step limit
+(default 5000) keeps a big loop from producing a recording many times the
+size of the actual data. If the limit is hit, the display says how many
+steps really ran and from where on something is missing.
+
+**How it works.** A `CompilationCustomizer` (`TraceTransformer`) injects a
+call to `TraceRecorder` in front of every statement, during the compiler's
+`CONVERSION` phase. At that point the AST is parsed but variables are not yet
+resolved, so the injected code goes through the same phases as
+hand-written code and needs no special treatment. Which variables are in
+scope at a given point is tracked by the transformer itself — a variable
+declared further down must not appear, or the generated code would fail with
+a `MissingPropertyException`.
+
+That gives real variable inspection **without a second process and without
+JDWP/JDI**. Closure bodies (including the implicit `it`), loop variables and
+catch variables are covered too. Statements are only ever instrumented
+*before*, never after — otherwise the last statement of a method would no
+longer be last, and Groovy's implicit return value would change.
+
+Without ⏱ Trace nothing is instrumented: a normal run is byte-for-byte what
+it was before.
+
+## Network access
 
 The server binds to `127.0.0.1` only by default and restricts file
 load/save to the project directory. To reach it from another machine:
@@ -339,8 +431,9 @@ testdata/                   input files and test case configs
 examples/                   a larger, more realistic example (see its own README)
 out/                        results (created on demand)
 src/main/java/com/sap/...   CPI API mocks (clean-room reimplementation)
-src/main/java/de/cpitester/ runner, CLI, web server
-src/main/resources/ui/      web UI (single self-contained file, no external dependencies)
+src/main/java/de/cpitester/ runner, code inspector, CLI, web server
+src/main/resources/ui/      web UI (one self-contained HTML file)
+  assets/codemirror/        bundled editor, MIT-licensed (no CDN, works offline)
 ```
 
 ## Contributing
